@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>認識分數數線</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .v-fraction {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .v-fraction .num {
+      border-bottom: 2px solid currentColor;
+      padding-bottom: 2px;
+      text-align: center;
+      width: 100%;
+    }
+    .v-fraction .den {
+      padding-top: 2px;
+      text-align: center;
+      width: 100%;
+    }
+    .mixed-num {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .swipe-track {
+      cursor: crosshair;
+      touch-action: none;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8)); }
+      50% { filter: drop-shadow(0 0 16px rgba(245, 158, 11, 1)); }
+    }
+    .animate-glow {
+      animation: pulse-glow 1.5s infinite ease-in-out;
+    }
+    @keyframes bar-drop {
+      0% { opacity: 0; transform: translateY(-20px) scale(0.96); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .animate-bar-drop {
+      animation: bar-drop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    .keypad-popover {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between p-2 md:p-4">
+
+  <!-- 頂部標題與模式切換區 -->
+  <header class="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-2 flex flex-col xl:flex-row justify-between items-center gap-3 border-b-4 border-blue-600">
+    <div class="flex items-center justify-between w-full xl:w-auto gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xl md:text-2xl font-bold shadow">
+          <i class="fa-solid fa-ruler-horizontal"></i>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-2xl font-black text-slate-900 tracking-wide">分數數線特訓營</h1>
+          <p class="text-xs md:text-sm text-slate-500 font-bold">劃量 1 ➔ 平分表徵 ➔ (斷尺前置) ➔ 亮燈累積 ➔ 刻度報讀</p>
+        </div>
+      </div>
+
+      <!-- 功能按鈕區 -->
+      <div class="flex items-center gap-2">
+        <button id="btnSound" onclick="toggleSound()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-1 transition text-xs md:text-sm border border-slate-300 min-h-[40px]">
+          <i class="fa-solid fa-volume-high text-blue-600" id="soundIcon"></i>
+          <span class="hidden sm:inline">音效</span>
+        </button>
+        <button onclick="resetCurrentQuestion()" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-xl flex items-center gap-1 transition text-xs md:text-sm border border-amber-300 min-h-[40px]">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>重來</span>
+        </button>
+        <button onclick="nextQuestion()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1 shadow transition text-xs md:text-sm min-h-[40px]">
+          <i class="fa-solid fa-shuffle"></i>
+          <span>換下一題</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 三大模式頁籤：基礎版 vs 進階版 vs 挑戰版 -->
+    <div class="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full xl:w-auto justify-center gap-1.5">
+      <button id="modeBasicBtn" onclick="switchMode('basic')" class="flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 bg-blue-600 text-white shadow min-h-[40px]">
+        <i class="fa-solid fa-seedling text-amber-300"></i> 基礎版（假分數）
+      </button>
+      <button id="modeAdvBtn" onclick="switchMode('advanced')" class="flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 text-slate-600 hover:bg-slate-200 min-h-[40px]">
+        <i class="fa-solid fa-brain text-purple-500"></i> 進階版（帶分數）
+      </button>
+      <button id="modeChallengeBtn" onclick="switchMode('challenge')" class="flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 text-slate-600 hover:bg-slate-200 min-h-[40px]">
+        <i class="fa-solid fa-fire text-rose-500"></i> 挑戰版（斷尺與隨機題）
+      </button>
+    </div>
+  </header>
+
+  <!-- 步驟導引列 (動態支援 2.5 斷尺步驟) -->
+  <section class="bg-slate-900 text-white rounded-2xl p-2.5 md:p-3 mb-2 shadow-md">
+    <div id="stepWizardContainer" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm">
+      <div id="step1Nav" class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 transition">
+        <span class="w-6 h-6 rounded-full bg-slate-700 text-white font-black text-xs flex items-center justify-center shrink-0">1</span>
+        <span class="font-bold">1: 劃出長度 1</span>
+      </div>
+      <div id="step2Nav" class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 transition">
+        <span class="w-6 h-6 rounded-full bg-slate-700 text-white font-black text-xs flex items-center justify-center shrink-0">2</span>
+        <span class="font-bold">2: 平分等份</span>
+      </div>
+      <div id="step3Nav" class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 transition">
+        <span class="w-6 h-6 rounded-full bg-slate-700 text-white font-black text-xs flex items-center justify-center shrink-0">3</span>
+        <span class="font-bold">3: 點擊亮燈累積</span>
+      </div>
+      <div id="step4Nav" class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 transition">
+        <span class="w-6 h-6 rounded-full bg-slate-700 text-white font-black text-xs flex items-center justify-center shrink-0">4</span>
+        <span class="font-bold">4: 報讀目標刻度</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 主內容區：數線畫布區 + 控制操作區 -->
+  <main class="flex-1 flex flex-col gap-2">
+
+    <!-- 步驟提示卡片與目標指示 -->
+    <div class="flex items-center justify-between bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 shadow-sm">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-black">
+          <i class="fa-solid fa-lightbulb"></i>
+        </div>
+        <div id="instructionText" class="font-black text-xs md:text-base text-blue-950">
+          <!-- 動態注入提示語 -->
+        </div>
+      </div>
+      <!-- 目標刻度指示標籤 -->
+      <div id="targetBadge" class="bg-amber-500 text-white text-xs md:text-sm px-3 py-1.5 rounded-full font-black shadow shrink-0 flex items-center gap-1.5 animate-glow">
+        <i class="fa-solid fa-bullseye"></i>
+        <span id="targetBadgeText">目標刻度位置已在數線上標記 🎯</span>
+      </div>
+    </div>
+
+    <!-- 核心數線畫布區 -->
+    <section id="numberLineStage" class="bg-white rounded-2xl p-3 md:p-5 shadow-sm border-2 border-slate-200 flex flex-col gap-1 relative overflow-hidden">
+      <div class="flex items-center justify-between text-xs font-bold text-slate-500">
+        <span class="flex items-center gap-1.5 text-slate-800 font-black text-sm md:text-base">
+          <i class="fa-solid fa-ruler-combined text-blue-600"></i> 數線與長方形積木互動區
+        </span>
+        <span id="rangeInfoText" class="text-slate-600 font-bold text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+          數線範圍：0 ～ 2
+        </span>
+      </div>
+
+      <!-- SVG 數線與動態長方形表徵對齊層 -->
+      <div id="canvasWrapper" class="w-full relative min-h-[290px] flex flex-col justify-center items-center select-none py-2">
+        
+        <!-- 上方長方形表徵層 -->
+        <div id="overlayBarsLayer" class="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-10">
+          <!-- JS 動態生成長方形、斷尺前置積木與點擊亮燈格 -->
+        </div>
+
+        <!-- SVG 數線與動態繪製刻度 -->
+        <svg id="numberLineSvg" class="w-full h-64 overflow-visible swipe-track">
+          <!-- 由 JS 繪製數線、斷尺符號、刻度與數字 -->
+        </svg>
+      </div>
+    </section>
+
+    <!-- 步驟互動操作面板 -->
+    <section class="bg-white rounded-2xl p-3 shadow-sm border-2 border-blue-100 flex flex-col justify-center items-center gap-3 min-h-[110px]">
+      <div id="stepControlPanel" class="flex flex-col justify-center items-center text-center w-full">
+        <!-- JS 根據目前步驟渲染按鈕、數字鍵盤與輸入題 -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 答對讚美與觀念總結 Modal -->
+  <div id="praiseModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-3xl p-5 md:p-6 max-w-lg w-full shadow-2xl border-4 border-amber-300 text-center transform scale-90 transition-transform duration-300" id="modalContent">
+      <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-2 text-amber-500 text-2xl shadow-inner">
+        <i class="fa-solid fa-trophy animate-bounce"></i>
+      </div>
+      <h3 class="text-xl md:text-2xl font-black text-slate-800 mb-1">恭喜答對！完全掌握分數數線！</h3>
+      <p class="text-xs md:text-sm font-bold text-slate-500 mb-3">你成功完成了長方形表徵劃分與累積量對應刻度的推理！</p>
+      
+      <!-- 觀念總結卡片 -->
+      <div id="modalExplanationBox" class="bg-blue-50 p-3 md:p-4 rounded-2xl border border-blue-200 mb-4 text-left text-xs md:text-sm text-slate-700 space-y-2 font-bold">
+        <!-- JS 動態生成觀念說明 -->
+      </div>
+
+      <button onclick="nextQuestion()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-base rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 min-h-[44px]">
+        <i class="fa-solid fa-arrow-right-long"></i>
+        <span>挑戰下一題</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // 1. 全局狀態與擴充題庫（支援 0~5 範圍與斷尺起點）
+    // -------------------------------------------------------------
+    const questionsPool = [
+      // 0~2, 0~3 基礎/進階題型
+      { id: 'q1', den: 4, startWhole: 0, maxWhole: 2, targetPos: 5, basicTarget: { num: 5, den: 4 }, advTarget: { whole: 1, num: 1, den: 4 } },
+      
+      // 斷尺挑戰題型 (置於第 2 題，確保挑戰版第 2 題立即出現斷尺)
+      { id: 'q10', den: 4, startWhole: 1, maxWhole: 3, targetPos: 9, basicTarget: { num: 9, den: 4 }, advTarget: { whole: 2, num: 1, den: 4 }, isBroken: true },
+      
+      { id: 'q2', den: 3, startWhole: 0, maxWhole: 3, targetPos: 7, basicTarget: { num: 7, den: 3 }, advTarget: { whole: 2, num: 1, den: 3 } },
+      
+      // 斷尺挑戰題型 (置於第 4 題)
+      { id: 'q11', den: 3, startWhole: 2, maxWhole: 5, targetPos: 11, basicTarget: { num: 11, den: 3 }, advTarget: { whole: 3, num: 2, den: 3 }, isBroken: true },
+      
+      { id: 'q3', den: 5, startWhole: 0, maxWhole: 2, targetPos: 7, basicTarget: { num: 7, den: 5 }, advTarget: { whole: 1, num: 2, den: 5 } },
+      { id: 'q4', den: 6, startWhole: 0, maxWhole: 3, targetPos: 14, basicTarget: { num: 14, den: 6 }, advTarget: { whole: 2, num: 2, den: 6 } },
+      { id: 'q5', den: 8, startWhole: 0, maxWhole: 2, targetPos: 11, basicTarget: { num: 11, den: 8 }, advTarget: { whole: 1, num: 3, den: 8 } },
+      
+      // 0~4, 0~5 擴充數線題型
+      { id: 'q6', den: 4, startWhole: 0, maxWhole: 4, targetPos: 13, basicTarget: { num: 13, den: 4 }, advTarget: { whole: 3, num: 1, den: 4 } },
+      { id: 'q7', den: 5, startWhole: 0, maxWhole: 5, targetPos: 21, basicTarget: { num: 21, den: 5 }, advTarget: { whole: 4, num: 1, den: 5 } },
+      { id: 'q8', den: 3, startWhole: 0, maxWhole: 5, targetPos: 11, basicTarget: { num: 11, den: 3 }, advTarget: { whole: 3, num: 2, den: 3 } },
+      { id: 'q9', den: 6, startWhole: 0, maxWhole: 4, targetPos: 19, basicTarget: { num: 19, den: 6 }, advTarget: { whole: 3, num: 1, den: 6 } },
+      
+      // 斷尺題型
+      { id: 'q12', den: 5, startWhole: 1, maxWhole: 4, targetPos: 13, basicTarget: { num: 13, den: 5 }, advTarget: { whole: 2, num: 3, den: 5 }, isBroken: true },
+      { id: 'q13', den: 4, startWhole: 2, maxWhole: 5, targetPos: 15, basicTarget: { num: 15, den: 4 }, advTarget: { whole: 3, num: 3, den: 4 }, isBroken: true }
+    ];
+
+    let currentMode = 'basic'; // 'basic' | 'advanced' | 'challenge'
+    let currentQIndex = 0;
+    let currentQuestion = questionsPool[0];
+
+    // 挑戰版專用：隨機要求假分數還是帶分數 ('improper' | 'mixed')
+    let challengeFormat = 'improper';
+
+    // 目前運作的區間 (從 startWhole 開始)
+    let currentUnitIndex = 0; 
+
+    // 步驟狀態：
+    // 1: 劃出 currentUnitIndex ~ currentUnitIndex+1 的長度
+    // 2: 長方形彈出 0~9 鍵盤輸入平分等份
+    // 2.5: (僅斷尺題) 點擊確認前置 0 ~ startWhole 的整體量積木
+    // 3: 點擊單位分數小格亮燈
+    // 4: 報讀目標刻度值（鍵盤輸入）
+    let currentStep = 1;
+
+    // 斷尺前置步驟狀態：記錄已點擊的前置整體數
+    let precedingWholesClicked = 0;
+
+    // 狀態追蹤
+    let isSwiping = false;
+    let swipeStartX = 0;
+    let swipeCurrentX = 0;
+
+    // 長方形平分與點擊亮燈狀態
+    let unitDivisions = {}; 
+    let litSlices = []; 
+
+    // 步驟 4 使用者鍵盤輸入狀態
+    let inputFocusField = 'den'; // 'den' -> 'num' (基礎版/假分數) 或 'whole' -> 'den' -> 'num' (帶分數)
+    let inputWholeVal = '';
+    let inputDenVal = '';
+    let inputNumVal = '';
+
+    let isSoundOn = true;
+
+    // 幾何座標與繪圖參數
+    let canvasMetrics = {
+      startX: 60,
+      endX: 740,
+      width: 800,
+      lineY: 170,
+      unitLengthX: 340,
+      stepWidthX: 85
+    };
+
+    // Audio Synth Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq = 440, type = 'sine', duration = 0.1) {
+      if (!isSoundOn) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      isSoundOn = !isSoundOn;
+      const icon = document.getElementById('soundIcon');
+      icon.className = isSoundOn ? 'fa-solid fa-volume-high text-blue-600' : 'fa-solid fa-volume-xmark text-slate-400';
+    }
+
+    // 輔助函式：產生 HTML 直式分數
+    function renderVerticalFractionHTML(num, den, whole = 0) {
+      if (whole > 0) {
+        return `
+          <span class="mixed-num">
+            <span class="text-base font-black">${whole}</span>
+            <span class="v-fraction text-xs md:text-sm font-black">
+              <span class="num">${num}</span>
+              <span class="den">${den}</span>
+            </span>
+          </span>
+        `;
+      }
+      return `
+        <span class="v-fraction text-xs md:text-sm font-black">
+          <span class="num">${num}</span>
+          <span class="den">${den}</span>
+        </span>
+      `;
+    }
+
+    window.onload = () => {
+      loadQuestion(0);
+      window.addEventListener('resize', handleResize);
+      setupSwipeEvents();
+    };
+
+    function handleResize() {
+      renderNumberLine();
+      renderOverlayBars();
+    }
+
+    function switchMode(mode) {
+      currentMode = mode;
+      
+      document.getElementById('modeBasicBtn').className = (mode === 'basic')
+        ? 'flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 bg-blue-600 text-white shadow min-h-[40px]'
+        : 'flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 text-slate-600 hover:bg-slate-200 min-h-[40px]';
+
+      document.getElementById('modeAdvBtn').className = (mode === 'advanced')
+        ? 'flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 bg-blue-600 text-white shadow min-h-[40px]'
+        : 'flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 text-slate-600 hover:bg-slate-200 min-h-[40px]';
+
+      document.getElementById('modeChallengeBtn').className = (mode === 'challenge')
+        ? 'flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 bg-blue-600 text-white shadow min-h-[40px]'
+        : 'flex-1 xl:flex-none px-3.5 py-2 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1 text-slate-600 hover:bg-slate-200 min-h-[40px]';
+
+      loadQuestion(0);
+    }
+
+    function loadQuestion(index) {
+      closePraiseModal();
+
+      // 根據模式篩選適用題庫
+      let availableQuestions = questionsPool;
+      if (currentMode === 'basic' || currentMode === 'advanced') {
+        availableQuestions = questionsPool.filter(q => !q.isBroken);
+      }
+
+      currentQIndex = index % availableQuestions.length;
+      currentQuestion = availableQuestions[currentQIndex];
+
+      // 斷尺題一律固定使用【帶分數】；一般題於挑戰版隨機設定輸入格式
+      if (currentQuestion.isBroken || (currentQuestion.startWhole || 0) > 0) {
+        challengeFormat = 'mixed';
+      } else if (currentMode === 'challenge') {
+        challengeFormat = (Math.random() > 0.5) ? 'improper' : 'mixed';
+      } else {
+        challengeFormat = (currentMode === 'basic') ? 'improper' : 'mixed';
+      }
+
+      const totalSlots = currentQuestion.maxWhole * currentQuestion.den;
+      litSlices = new Array(totalSlots).fill(false);
+      unitDivisions = {};
+
+      const startW = currentQuestion.startWhole || 0;
+      currentUnitIndex = startW; 
+      currentStep = 1;      
+      precedingWholesClicked = 0;
+
+      // 預設鍵盤焦點
+      inputFocusField = (challengeFormat === 'improper') ? 'den' : 'whole';
+      inputWholeVal = '';
+      inputDenVal = '';
+      inputNumVal = '';
+
+      document.getElementById('rangeInfoText').textContent = `數線範圍：${startW} ～ ${currentQuestion.maxWhole}`;
+
+      updateUI();
+    }
+
+    function resetCurrentQuestion() {
+      loadQuestion(currentQIndex);
+    }
+
+    function nextQuestion() {
+      loadQuestion(currentQIndex + 1);
+    }
+
+    function updateUI() {
+      updateStepWizard();
+      renderNumberLine();
+      renderOverlayBars();
+      renderControlPanel();
+    }
+
+    function updateStepWizard() {
+      const container = document.getElementById('stepWizardContainer');
+      const isBroken = (currentQuestion.startWhole || 0) > 0 && currentMode === 'challenge';
+
+      if (isBroken) {
+        container.className = "grid grid-cols-2 md:grid-cols-5 gap-1.5 text-xs md:text-sm";
+        container.innerHTML = `
+          <div id="step1Nav" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition">
+            <span class="w-5 h-5 rounded-full font-black text-xs flex items-center justify-center shrink-0">1</span>
+            <span class="font-bold">1: 劃線</span>
+          </div>
+          <div id="step2Nav" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition">
+            <span class="w-5 h-5 rounded-full font-black text-xs flex items-center justify-center shrink-0">2</span>
+            <span class="font-bold">2: 平分</span>
+          </div>
+          <div id="step2_5Nav" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition">
+            <span class="w-5 h-5 rounded-full font-black text-xs flex items-center justify-center shrink-0">⚡</span>
+            <span class="font-bold">2.5: 前置量</span>
+          </div>
+          <div id="step3Nav" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition">
+            <span class="w-5 h-5 rounded-full font-black text-xs flex items-center justify-center shrink-0">3</span>
+            <span class="font-bold">3: 亮燈</span>
+          </div>
+          <div id="step4Nav" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition">
+            <span class="w-5 h-5 rounded-full font-black text-xs flex items-center justify-center shrink-0">4</span>
+            <span class="font-bold">4: 報讀</span>
+          </div>
+        `;
+      } else {
+        container.className = "grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm";
+        container.innerHTML = `
+          <div id="step1Nav" class="flex items-center gap-2 px-3 py-2 rounded-xl border transition">
+            <span class="w-6 h-6 rounded-full font-black text-xs flex items-center justify-center shrink-0">1</span>
+            <span class="font-bold">1: 劃出長度 1</span>
+          </div>
+          <div id="step2Nav" class="flex items-center gap-2 px-3 py-2 rounded-xl border transition">
+            <span class="w-6 h-6 rounded-full font-black text-xs flex items-center justify-center shrink-0">2</span>
+            <span class="font-bold">2: 平分等份</span>
+          </div>
+          <div id="step3Nav" class="flex items-center gap-2 px-3 py-2 rounded-xl border transition">
+            <span class="w-6 h-6 rounded-full font-black text-xs flex items-center justify-center shrink-0">3</span>
+            <span class="font-bold">3: 點擊亮燈累積</span>
+          </div>
+          <div id="step4Nav" class="flex items-center gap-2 px-3 py-2 rounded-xl border transition">
+            <span class="w-6 h-6 rounded-full font-black text-xs flex items-center justify-center shrink-0">4</span>
+            <span class="font-bold">4: 報讀目標刻度</span>
+          </div>
+        `;
+      }
+
+      const stepsList = isBroken ? [1, 2, 2.5, 3, 4] : [1, 2, 3, 4];
+
+      stepsList.forEach(s => {
+        const sKey = (s === 2.5) ? '2_5' : s;
+        const nav = document.getElementById(`step${sKey}Nav`);
+        if (!nav) return;
+
+        let status = 'future';
+        if (s < currentStep) status = 'completed';
+        else if (s === currentStep) status = 'current';
+
+        if (status === 'completed') {
+          nav.className = 'flex items-center gap-1.5 bg-emerald-600 text-white px-2.5 py-1.5 rounded-xl border border-emerald-500 transition font-bold text-xs';
+          nav.querySelector('span').className = 'w-5 h-5 rounded-full bg-white text-emerald-700 font-black text-xs flex items-center justify-center shrink-0';
+          nav.querySelector('span').innerHTML = '<i class="fa-solid fa-check"></i>';
+        } else if (status === 'current') {
+          nav.className = 'flex items-center gap-1.5 bg-blue-600 text-white px-2.5 py-1.5 rounded-xl border border-blue-400 transition shadow-lg font-black text-xs scale-105';
+          nav.querySelector('span').className = 'w-5 h-5 rounded-full bg-amber-400 text-blue-950 font-black text-xs flex items-center justify-center shrink-0';
+          if (s === 2.5) nav.querySelector('span').textContent = '⚡';
+          else nav.querySelector('span').textContent = s;
+        } else {
+          nav.className = 'flex items-center gap-1.5 bg-slate-800 text-slate-400 px-2.5 py-1.5 rounded-xl border border-slate-700 transition font-normal text-xs opacity-70';
+          nav.querySelector('span').className = 'w-5 h-5 rounded-full bg-slate-700 text-slate-400 font-black text-xs flex items-center justify-center shrink-0';
+          if (s === 2.5) nav.querySelector('span').textContent = '⚡';
+          else nav.querySelector('span').textContent = s;
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // SVG 數線畫布繪製 (支援斷尺與動態刻度)
+    // -------------------------------------------------------------
+    function renderNumberLine() {
+      const svg = document.getElementById('numberLineSvg');
+      svg.innerHTML = '';
+
+      const wrapperWidth = document.getElementById('canvasWrapper').clientWidth || 800;
+      const den = currentQuestion.den;
+      const startW = currentQuestion.startWhole || 0;
+      const maxW = currentQuestion.maxWhole;
+      
+      // 斷尺題留出左側空間以顯示前置整體量圖卡
+      const leftMargin = (startW > 0) ? Math.max(180, wrapperWidth * 0.25) : 55;
+      const rightMargin = 55;
+      const startX = leftMargin;
+      const endX = wrapperWidth - rightMargin;
+      const lineY = 170;
+
+      const totalUnitsOnLine = maxW - startW;
+      const unitLengthX = (endX - startX) / totalUnitsOnLine;
+      const stepWidthX = unitLengthX / den;
+
+      canvasMetrics = { startX, endX, width: wrapperWidth, lineY, unitLengthX, stepWidthX };
+
+      // 1. 斷尺前置整體量圖卡與鋸齒線符號 (若 startW > 0)
+      if (startW > 0) {
+        // 繪製斷尺前置整體量 (數字 1, 2, ...) 動態圖卡
+        const precedingZoneWidth = startX - 45;
+        const blockWidth = Math.min(75, precedingZoneWidth / startW);
+
+        for (let k = 1; k <= startW; k++) {
+          const isConfirmed = k <= precedingWholesClicked;
+          const boxX = 10 + (k - 1) * (blockWidth + 6);
+          const boxY = lineY - 62;
+
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+          // 積木圖卡背景
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', boxX);
+          rect.setAttribute('y', boxY);
+          rect.setAttribute('width', blockWidth);
+          rect.setAttribute('height', '44');
+          rect.setAttribute('rx', '10');
+          rect.setAttribute('fill', isConfirmed ? '#10b981' : '#f8fafc');
+          rect.setAttribute('stroke', isConfirmed ? '#059669' : '#94a3b8');
+          rect.setAttribute('stroke-width', '2.5');
+          if (!isConfirmed) rect.setAttribute('stroke-dasharray', '4 3');
+          g.appendChild(rect);
+
+          // 大數字標示 (1, 2)
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', boxX + blockWidth / 2);
+          text.setAttribute('y', boxY + 28);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-weight', '900');
+          text.setAttribute('fill', isConfirmed ? '#ffffff' : '#64748b');
+          text.setAttribute('font-size', '17');
+          text.textContent = isConfirmed ? `✓ ${k}` : `${k}?`;
+          g.appendChild(text);
+
+          // 說明文字 (整體 1, 整體 2)
+          const subText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          subText.setAttribute('x', boxX + blockWidth / 2);
+          subText.setAttribute('y', boxY + 58);
+          subText.setAttribute('text-anchor', 'middle');
+          subText.setAttribute('font-weight', '800');
+          subText.setAttribute('fill', isConfirmed ? '#047857' : '#64748b');
+          subText.setAttribute('font-size', '11');
+          subText.textContent = `整體 ${k}`;
+          g.appendChild(subText);
+
+          svg.appendChild(g);
+        }
+
+        // 鋸齒線符號
+        const breakPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        breakPath.setAttribute('d', `M ${startX - 30} ${lineY} L ${startX - 22} ${lineY - 14} L ${startX - 14} ${lineY + 14} L ${startX - 6} ${lineY - 14} L ${startX} ${lineY}`);
+        breakPath.setAttribute('stroke', '#e11d48');
+        breakPath.setAttribute('stroke-width', '4');
+        breakPath.setAttribute('fill', 'none');
+        svg.appendChild(breakPath);
+
+        const breakText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        breakText.setAttribute('x', startX - 18);
+        breakText.setAttribute('y', lineY - 24);
+        breakText.setAttribute('text-anchor', 'middle');
+        breakText.setAttribute('fill', '#e11d48');
+        breakText.setAttribute('font-weight', '900');
+        breakText.setAttribute('font-size', '12');
+        breakText.textContent = '斷尺';
+        svg.appendChild(breakText);
+      }
+
+      // 數線主軸
+      const mainLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      mainLine.setAttribute('x1', startX - (startW > 0 ? 5 : 15));
+      mainLine.setAttribute('y1', lineY);
+      mainLine.setAttribute('x2', endX + 15);
+      mainLine.setAttribute('y2', lineY);
+      mainLine.setAttribute('stroke', '#0f172a');
+      mainLine.setAttribute('stroke-width', '5');
+      mainLine.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(mainLine);
+
+      // 數線箭頭
+      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arrow.setAttribute('d', `M ${endX + 15} ${lineY - 7} L ${endX + 27} ${lineY} L ${endX + 15} ${lineY + 7} Z`);
+      arrow.setAttribute('fill', '#0f172a');
+      svg.appendChild(arrow);
+
+      // 步驟 1：手指/滑鼠拖曳軌跡
+      if (currentStep === 1) {
+        const uIdxOnLine = currentUnitIndex - startW;
+        const uStartX = startX + uIdxOnLine * unitLengthX;
+        const uEndX = uStartX + unitLengthX;
+
+        // 提示虛線
+        const trackGuide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        trackGuide.setAttribute('x1', uStartX);
+        trackGuide.setAttribute('y1', lineY);
+        trackGuide.setAttribute('x2', uEndX);
+        trackGuide.setAttribute('y2', lineY);
+        trackGuide.setAttribute('stroke', '#3b82f6');
+        trackGuide.setAttribute('stroke-width', '8');
+        trackGuide.setAttribute('stroke-dasharray', '6 4');
+        trackGuide.setAttribute('class', 'animate-pulse');
+        svg.appendChild(trackGuide);
+
+        if (isSwiping) {
+          const swipeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          swipeLine.setAttribute('x1', uStartX);
+          swipeLine.setAttribute('y1', lineY);
+          swipeLine.setAttribute('x2', Math.min(uEndX, Math.max(uStartX, swipeCurrentX)));
+          swipeLine.setAttribute('y2', lineY);
+          swipeLine.setAttribute('stroke', '#2563eb');
+          swipeLine.setAttribute('stroke-width', '10');
+          swipeLine.setAttribute('stroke-linecap', 'round');
+          svg.appendChild(swipeLine);
+        }
+
+        const startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        startCircle.setAttribute('cx', uStartX);
+        startCircle.setAttribute('cy', lineY);
+        startCircle.setAttribute('r', '10');
+        startCircle.setAttribute('fill', '#2563eb');
+        startCircle.setAttribute('class', 'animate-glow');
+        svg.appendChild(startCircle);
+
+        const endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        endCircle.setAttribute('cx', uEndX);
+        endCircle.setAttribute('cy', lineY);
+        endCircle.setAttribute('r', '10');
+        endCircle.setAttribute('fill', '#f59e0b');
+        svg.appendChild(endCircle);
+      }
+
+      // 2. 刻度線與標籤
+      const totalTicksOnLine = totalUnitsOnLine * den;
+
+      for (let i = 0; i <= totalTicksOnLine; i++) {
+        const globalTickIndex = startW * den + i;
+        const isMajor = (i % den === 0);
+        const tickX = startX + i * stepWidthX;
+
+        // 刻度線
+        const tickLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tickLine.setAttribute('x1', tickX);
+        tickLine.setAttribute('y1', isMajor ? lineY - 20 : lineY - 12);
+        tickLine.setAttribute('x2', tickX);
+        tickLine.setAttribute('y2', isMajor ? lineY + 20 : lineY + 12);
+        tickLine.setAttribute('stroke', isMajor ? '#0f172a' : '#64748b');
+        tickLine.setAttribute('stroke-width', isMajor ? '4' : '2.5');
+        svg.appendChild(tickLine);
+
+        // 刻度數字
+        if (isMajor) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', tickX);
+          text.setAttribute('y', lineY + 44);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-weight', '900');
+          text.setAttribute('fill', '#0f172a');
+          text.setAttribute('font-size', '20');
+          text.textContent = startW + (i / den);
+          svg.appendChild(text);
+        } else if (i === 1) {
+          // 第一刻度
+          if (currentMode === 'basic') {
+            appendSVGVerticalFraction(svg, tickX, lineY + 36, 1, den, '#2563eb');
+          } else {
+            const qText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            qText.setAttribute('x', tickX);
+            qText.setAttribute('y', lineY + 44);
+            qText.setAttribute('text-anchor', 'middle');
+            qText.setAttribute('font-weight', '900');
+            qText.setAttribute('fill', '#d97706');
+            qText.setAttribute('font-size', '20');
+            qText.textContent = '?';
+            svg.appendChild(qText);
+          }
+        }
+
+        // 目標刻度旗幟
+        if (globalTickIndex === currentQuestion.targetPos) {
+          const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          group.setAttribute('class', 'animate-glow');
+
+          const ptr = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          ptr.setAttribute('d', `M ${tickX} ${lineY - 26} L ${tickX - 8} ${lineY - 38} L ${tickX + 8} ${lineY - 38} Z`);
+          ptr.setAttribute('fill', '#f59e0b');
+          group.appendChild(ptr);
+
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', tickX - 32);
+          rect.setAttribute('y', lineY - 74);
+          rect.setAttribute('width', '64');
+          rect.setAttribute('height', '36');
+          rect.setAttribute('fill', '#fef3c7');
+          rect.setAttribute('stroke', '#f59e0b');
+          rect.setAttribute('stroke-width', '2.5');
+          rect.setAttribute('rx', '8');
+          group.appendChild(rect);
+
+          const targetLabelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          targetLabelText.setAttribute('x', tickX);
+          targetLabelText.setAttribute('y', lineY - 50);
+          targetLabelText.setAttribute('text-anchor', 'middle');
+          targetLabelText.setAttribute('fill', '#b45309');
+          targetLabelText.setAttribute('font-weight', '900');
+          targetLabelText.setAttribute('font-size', '15');
+          targetLabelText.textContent = '🎯 目標 ?';
+          group.appendChild(targetLabelText);
+
+          svg.appendChild(group);
+        }
+      }
+    }
+
+    function appendSVGVerticalFraction(svg, x, y, num, den, color = '#2563eb', whole = 0) {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      
+      let offsetX = x;
+      if (whole > 0) {
+        const wText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        wText.setAttribute('x', x - 10);
+        wText.setAttribute('y', y + 6);
+        wText.setAttribute('text-anchor', 'middle');
+        wText.setAttribute('font-weight', '900');
+        wText.setAttribute('fill', color);
+        wText.setAttribute('font-size', '16');
+        wText.textContent = whole;
+        g.appendChild(wText);
+        offsetX = x + 6;
+      }
+
+      const numText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      numText.setAttribute('x', offsetX);
+      numText.setAttribute('y', y - 4);
+      numText.setAttribute('text-anchor', 'middle');
+      numText.setAttribute('font-weight', '900');
+      numText.setAttribute('fill', color);
+      numText.setAttribute('font-size', '12');
+      numText.textContent = num;
+      g.appendChild(numText);
+
+      const divLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      divLine.setAttribute('x1', offsetX - 8);
+      divLine.setAttribute('y1', y);
+      divLine.setAttribute('x2', offsetX + 8);
+      divLine.setAttribute('y2', y);
+      divLine.setAttribute('stroke', color);
+      divLine.setAttribute('stroke-width', '2');
+      g.appendChild(divLine);
+
+      const denText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      denText.setAttribute('x', offsetX);
+      denText.setAttribute('y', y + 12);
+      denText.setAttribute('text-anchor', 'middle');
+      denText.setAttribute('font-weight', '900');
+      denText.setAttribute('fill', color);
+      denText.setAttribute('font-size', '12');
+      denText.textContent = den;
+      g.appendChild(denText);
+
+      svg.appendChild(g);
+    }
+
+    // -------------------------------------------------------------
+    // 長方形表徵繪製、PopOver 數字鍵盤、斷尺認領與點擊亮燈
+    // -------------------------------------------------------------
+    function renderOverlayBars() {
+      const layer = document.getElementById('overlayBarsLayer');
+      layer.innerHTML = '';
+
+      const { startX, lineY, unitLengthX } = canvasMetrics;
+      const startW = currentQuestion.startWhole || 0;
+
+      // 繪製過去與當前區段的長方形
+      for (let u = startW; u <= currentUnitIndex; u++) {
+        const uIdxOnLine = u - startW;
+        const uLeft = startX + uIdxOnLine * unitLengthX;
+        const barY = lineY - 65;
+
+        // 步驟 1 且為當前區區劃：尚未降下長方形
+        if (u === currentUnitIndex && currentStep === 1) continue;
+
+        const barContainer = document.createElement('div');
+        barContainer.className = 'absolute pointer-events-auto transition-all animate-bar-drop flex items-center justify-center';
+        barContainer.style.left = `${uLeft}px`;
+        barContainer.style.width = `${unitLengthX}px`;
+        barContainer.style.top = `${barY}px`;
+        barContainer.style.height = '50px';
+
+        if (u === currentUnitIndex && currentStep === 2) {
+          // 步驟 2：彈出 0~9 數字鍵盤
+          barContainer.className += ' bg-amber-200/90 border-4 border-amber-500 rounded-2xl shadow-xl';
+          
+          const popover = document.createElement('div');
+          popover.className = 'keypad-popover absolute z-30 bg-white border-4 border-amber-400 rounded-2xl p-3 shadow-2xl flex flex-col items-center gap-2 animate-bounce';
+          popover.style.top = '-110px';
+
+          popover.innerHTML = `
+            <div class="text-amber-950 font-black text-xs md:text-sm flex items-center gap-1">
+              <i class="fa-solid fa-scissors text-amber-600"></i>
+              <span>這段「1 個單位量」被平分成幾等分？</span>
+            </div>
+            <div class="grid grid-cols-5 gap-1.5 w-full">
+              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `
+                <button onclick="submitStep2Division(${n})" class="py-1.5 bg-amber-100 hover:bg-amber-500 hover:text-white text-amber-950 font-black rounded-xl text-sm border-2 border-amber-300 transition active:scale-95 shadow">
+                  ${n}
+                </button>
+              `).join('')}
+            </div>
+          `;
+          barContainer.appendChild(popover);
+        } 
+        else if (unitDivisions[u]) {
+          // 步驟 3/4：已平分的長方形
+          barContainer.className += ' border-4 border-blue-600 rounded-2xl bg-blue-50/70 shadow-md overflow-hidden flex';
+          
+          const divCount = unitDivisions[u];
+          const sliceWidth = unitLengthX / divCount;
+
+          for (let s = 0; s < divCount; s++) {
+            const globalSliceIdx = u * divCount + s;
+            const isLit = litSlices[globalSliceIdx];
+
+            const sliceDiv = document.createElement('div');
+            sliceDiv.style.width = `${sliceWidth}px`;
+            sliceDiv.className = `h-full border-r-2 border-dashed border-blue-400 flex items-center justify-center font-black text-xs cursor-pointer transition-all last:border-r-0 ${
+              isLit ? 'bg-amber-400 text-amber-950 shadow-inner' : 'hover:bg-blue-200/80 text-blue-800'
+            }`;
+
+            sliceDiv.innerHTML = renderVerticalFractionHTML(1, divCount);
+
+            if (currentStep === 3) {
+              sliceDiv.onclick = () => toggleSliceLight(globalSliceIdx);
+            }
+
+            barContainer.appendChild(sliceDiv);
+          }
+        }
+
+        layer.appendChild(barContainer);
+      }
+    }
+
+    // 步驟 2：選擇平分等份
+    function submitStep2Division(selectedDiv) {
+      if (selectedDiv === currentQuestion.den) {
+        playBeep(880, 'sine', 0.2);
+        unitDivisions[currentUnitIndex] = selectedDiv;
+        showToast(`答對了！這段「1 個單位量」被平分成 ${selectedDiv} 等份！`);
+        
+        const startW = currentQuestion.startWhole || 0;
+        // 如果是斷尺題型且尚未認領前置整數，先進入步驟 2.5
+        if (startW > 0 && precedingWholesClicked < startW) {
+          currentStep = 2.5;
+        } else {
+          currentStep = 3;
+        }
+        updateUI();
+      } else {
+        playBeep(220, 'sawtooth', 0.2);
+        showToast(`不對喔！這段單位量被平分成 ${currentQuestion.den} 等份才對，再試一次！`);
+      }
+    }
+
+    // 步驟 2.5：斷尺前置整數點擊認領 (修正卡住 BUG 並填充前置累積格)
+    function clickPrecedingWhole(index) {
+      if (index === precedingWholesClicked + 1) {
+        precedingWholesClicked++;
+        playBeep(600 + precedingWholesClicked * 100, 'sine', 0.15);
+        showToast(`成功確認第 ${precedingWholesClicked} 個前置整體「${precedingWholesClicked}」！`);
+        
+        const startW = currentQuestion.startWhole || 0;
+        if (precedingWholesClicked === startW) {
+          // 關鍵修復：將前置整數包含的所有單位分數小格標記為已累積亮燈
+          const totalPrecedingSlices = startW * currentQuestion.den;
+          for (let k = 0; k < totalPrecedingSlices; k++) {
+            litSlices[k] = true;
+          }
+
+          setTimeout(() => {
+            currentStep = 3;
+            updateUI();
+          }, 700);
+        } else {
+          updateUI();
+        }
+      } else {
+        showToast(`請依序從第 1 個整體開始點擊確認喔！`);
+      }
+    }
+
+    // 步驟 3：點擊單位分數小格亮燈
+    function toggleSliceLight(globalIndex) {
+      const currentLitCount = litSlices.filter(Boolean).length;
+
+      if (!litSlices[globalIndex]) {
+        if (globalIndex === currentLitCount) {
+          litSlices[globalIndex] = true;
+          playBeep(500 + globalIndex * 50, 'sine', 0.1);
+          checkStep3Progress();
+        } else {
+          showToast('請依照數線從左到右的順序，依序點亮單位分數小格喔！');
+        }
+      } else {
+        if (globalIndex === currentLitCount - 1) {
+          litSlices[globalIndex] = false;
+          playBeep(350, 'sine', 0.08);
+          renderOverlayBars();
+          renderControlPanel();
+        }
+      }
+    }
+
+    function checkStep3Progress() {
+      const litCount = litSlices.filter(Boolean).length;
+      renderOverlayBars();
+      renderControlPanel();
+
+      if (litCount === currentQuestion.targetPos) {
+        playBeep(900, 'sine', 0.25);
+        showToast('太棒了！已順利亮燈累積到目標刻度！請準備輸入刻度值！');
+        setTimeout(() => {
+          currentStep = 4;
+          updateUI();
+        }, 1000);
+      } else if (litCount % currentQuestion.den === 0) {
+        currentUnitIndex++;
+        currentStep = 1;
+        playBeep(700, 'sine', 0.2);
+        showToast(`長方形「1」已點滿！請繼續劃出下一個單位量（${currentUnitIndex} ~ ${currentUnitIndex + 1}）！`);
+        updateUI();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 手指/滑鼠劃出單位長度手勢
+    // -------------------------------------------------------------
+    function setupSwipeEvents() {
+      const svg = document.getElementById('numberLineSvg');
+
+      const handleStart = (clientX) => {
+        if (currentStep !== 1) return;
+        const rect = svg.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const startW = currentQuestion.startWhole || 0;
+        const uIdxOnLine = currentUnitIndex - startW;
+        const uStartX = canvasMetrics.startX + uIdxOnLine * canvasMetrics.unitLengthX;
+
+        if (Math.abs(x - uStartX) < 45) {
+          isSwiping = true;
+          swipeStartX = uStartX;
+          swipeCurrentX = x;
+          renderNumberLine();
+        }
+      };
+
+      const handleMove = (clientX) => {
+        if (!isSwiping || currentStep !== 1) return;
+        const rect = svg.getBoundingClientRect();
+        swipeCurrentX = clientX - rect.left;
+        renderNumberLine();
+
+        const startW = currentQuestion.startWhole || 0;
+        const uIdxOnLine = currentUnitIndex - startW;
+        const uStartX = canvasMetrics.startX + uIdxOnLine * canvasMetrics.unitLengthX;
+        const uEndX = uStartX + canvasMetrics.unitLengthX;
+
+        if (swipeCurrentX >= uEndX - 10) {
+          isSwiping = false;
+          playBeep(800, 'sine', 0.15);
+          showToast(`成功劃出長度「1」！長方形表徵已降下！`);
+          
+          currentStep = 2;
+          updateUI();
+        }
+      };
+
+      const handleEnd = () => {
+        if (isSwiping) {
+          isSwiping = false;
+          showToast(`請從 ${currentUnitIndex} 順暢拉到 ${currentUnitIndex + 1} 的位置喔！`);
+          renderNumberLine();
+        }
+      };
+
+      svg.addEventListener('mousedown', (e) => handleStart(e.clientX));
+      window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+      window.addEventListener('mouseup', handleEnd);
+
+      svg.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) handleStart(e.touches[0].clientX);
+      }, { passive: true });
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) handleMove(e.touches[0].clientX);
+      }, { passive: true });
+      window.addEventListener('touchend', handleEnd);
+    }
+
+    // -------------------------------------------------------------
+    // 控制面板與步驟 UI 操作邏輯
+    // -------------------------------------------------------------
+    function renderControlPanel() {
+      const panel = document.getElementById('stepControlPanel');
+      const instruction = document.getElementById('instructionText');
+      panel.innerHTML = '';
+
+      const startUnit = currentUnitIndex;
+      const endUnit = currentUnitIndex + 1;
+      const startW = currentQuestion.startWhole || 0;
+
+      if (currentStep === 1) {
+        instruction.innerHTML = `【步驟 1】請用手指或滑鼠從數線上 <span class="text-blue-600 font-black text-lg">${startUnit}</span> 拖曳拉到 <span class="text-blue-600 font-black text-lg">${endUnit}</span>，劃出「1 個單位量」的長度！`;
+        panel.innerHTML = `
+          <p class="text-slate-700 font-bold text-xs md:text-sm animate-pulse">
+            👉 請在數線上從 ${startUnit} 滑動到 ${endUnit}
+          </p>
+        `;
+      } else if (currentStep === 2) {
+        instruction.innerHTML = `【步驟 2】觀察長方形正中央的數字鍵盤，這段「1 個單位量」被刻度平分成幾等分？`;
+        panel.innerHTML = `
+          <p class="text-amber-800 font-black text-xs md:text-sm">
+            💡 請點擊長方形中央浮現的數字鍵盤回答平分等份！
+          </p>
+        `;
+      } else if (currentStep === 2.5) {
+        // 斷尺前置量認領提示
+        instruction.innerHTML = `【步驟 2.5】這是一把從 <span class="text-rose-600 font-black text-lg">${startW}</span> 開始的斷尺數線！請點擊下方面板確認前面的 <span class="text-rose-600 font-black text-lg">${startW}</span> 個整體，會同步顯示在數線斷尺區！`;
+        
+        panel.innerHTML = `
+          <div class="flex flex-col items-center gap-3">
+            <div class="text-xs font-black text-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-link text-rose-500"></i>
+              <span>點擊認領前置省略的 0 ～ ${startW} 累積量：</span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${Array.from({ length: startW }, (_, i) => i + 1).map(idx => {
+                const isClicked = idx <= precedingWholesClicked;
+                return `
+                  <button onclick="clickPrecedingWhole(${idx})" class="px-4 py-2.5 rounded-2xl font-black text-xs md:text-sm shadow transition border-2 flex items-center gap-2 ${
+                    isClicked 
+                      ? 'bg-emerald-500 text-white border-emerald-600 scale-95 shadow-inner' 
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-400 animate-bounce'
+                  }">
+                    <i class="fa-solid ${isClicked ? 'fa-circle-check' : 'fa-square'}"></i>
+                    <span>整體 ${idx} (${idx - 1} ~ ${idx})</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentStep === 3) {
+        const litCount = litSlices.filter(Boolean).length;
+        instruction.innerHTML = `【步驟 3】請依序點擊長方形中的小格（單位分數），讓它亮燈發光累積長度！`;
+        panel.innerHTML = `
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-slate-700 font-bold text-xs md:text-sm">
+              已累積亮燈：<span class="text-blue-600 font-black text-base">${litCount}</span> / ${currentQuestion.targetPos} 格
+            </p>
+          </div>
+        `;
+      } else if (currentStep === 4) {
+        const isImproperMode = (challengeFormat === 'improper');
+        
+        instruction.innerHTML = `【步驟 4】請根據亮燈累積的總量，請用【<span class="text-amber-600 font-black text-base">${isImproperMode ? '假分數' : '帶分數'}</span>】格式輸入目標刻度【?】的值！`;
+
+        panel.innerHTML = `
+          <div class="flex flex-col xl:flex-row items-center justify-center gap-4 w-full">
+            
+            <!-- 分數輸入顯示方塊 -->
+            <div class="flex items-center gap-3 bg-slate-100 p-3 rounded-2xl border-2 border-slate-300">
+              <span class="font-black text-slate-700 text-xs md:text-sm">輸入：</span>
+              
+              ${!isImproperMode ? `
+                <!-- 整數部分 (僅帶分數模式顯示) -->
+                <div onclick="setFocusField('whole')" class="w-12 h-12 bg-white border-4 ${inputFocusField === 'whole' ? 'border-amber-500 bg-amber-50 shadow-md scale-105' : 'border-slate-300'} rounded-xl flex items-center justify-center text-slate-900 font-black text-xl cursor-pointer">
+                  ${inputWholeVal || '<span class="text-slate-300 text-xs">整數</span>'}
+                </div>
+              ` : ''}
+
+              <!-- 分數部分 (分子/分母) -->
+              <div class="flex flex-col items-center gap-1">
+                <!-- 分子 -->
+                <div onclick="setFocusField('num')" class="w-12 h-10 bg-white border-4 ${inputFocusField === 'num' ? 'border-amber-500 bg-amber-50 shadow-md scale-105' : 'border-slate-300'} rounded-xl flex items-center justify-center text-slate-900 font-black text-base cursor-pointer">
+                  ${inputNumVal || '<span class="text-slate-300 text-xs">分子</span>'}
+                </div>
+                <div class="w-12 h-1 bg-slate-800 rounded"></div>
+                <!-- 分母 -->
+                <div onclick="setFocusField('den')" class="w-12 h-10 bg-white border-4 ${inputFocusField === 'den' ? 'border-amber-500 bg-amber-50 shadow-md scale-105' : 'border-slate-300'} rounded-xl flex items-center justify-center text-slate-900 font-black text-base cursor-pointer">
+                  ${inputDenVal || '<span class="text-slate-300 text-xs">分母</span>'}
+                </div>
+              </div>
+
+              <button onclick="clearCurrentInput()" class="px-2.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs">
+                清除
+              </button>
+            </div>
+
+            <!-- 0~9 數字鍵盤 -->
+            <div class="flex flex-col items-center gap-2">
+              <div class="grid grid-cols-5 gap-1.5">
+                ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(digit => `
+                  <button onclick="typeDigit(${digit})" class="w-9 h-9 md:w-10 md:h-10 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-sm shadow transition active:scale-95">
+                    ${digit}
+                  </button>
+                `).join('')}
+              </div>
+              <div class="text-[11px] font-bold text-slate-500">
+                ${isImproperMode 
+                  ? '順序：點擊 <span class="text-amber-600 font-black">分母</span> ➔ <span class="text-amber-600 font-black">分子</span> 輸入' 
+                  : '順序：點擊 <span class="text-amber-600 font-black">整數</span> ➔ <span class="text-amber-600 font-black">分母</span> ➔ <span class="text-amber-600 font-black">分子</span> 輸入'}
+              </div>
+            </div>
+
+            <button onclick="verifyFinalAnswer()" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg transition active:scale-95 text-sm md:text-base border-b-4 border-emerald-800">
+              檢查答案 <i class="fa-solid fa-circle-check"></i>
+            </button>
+
+          </div>
+        `;
+      }
+    }
+
+    function setFocusField(field) {
+      inputFocusField = field;
+      playBeep(600, 'sine', 0.05);
+      renderControlPanel();
+    }
+
+    function typeDigit(digit) {
+      playBeep(700, 'sine', 0.05);
+
+      const isImproperMode = (challengeFormat === 'improper');
+
+      if (isImproperMode) {
+        if (inputFocusField === 'den') {
+          inputDenVal += digit.toString();
+          inputFocusField = 'num';
+        } else if (inputFocusField === 'num') {
+          inputNumVal += digit.toString();
+        }
+      } else {
+        if (inputFocusField === 'whole') {
+          inputWholeVal += digit.toString();
+          inputFocusField = 'den';
+        } else if (inputFocusField === 'den') {
+          inputDenVal += digit.toString();
+          inputFocusField = 'num';
+        } else if (inputFocusField === 'num') {
+          inputNumVal += digit.toString();
+        }
+      }
+
+      renderControlPanel();
+    }
+
+    function clearCurrentInput() {
+      playBeep(300, 'sine', 0.08);
+      inputWholeVal = '';
+      inputDenVal = '';
+      inputNumVal = '';
+      inputFocusField = (challengeFormat === 'improper') ? 'den' : 'whole';
+      renderControlPanel();
+    }
+
+    // -------------------------------------------------------------
+    // 驗證最終答案與說明卡片
+    // -------------------------------------------------------------
+    function verifyFinalAnswer() {
+      const den = currentQuestion.den;
+      const target = currentQuestion.targetPos;
+
+      const userWhole = parseInt(inputWholeVal) || 0;
+      const userDen = parseInt(inputDenVal) || 0;
+      const userNum = parseInt(inputNumVal) || 0;
+
+      if (!userDen || !userNum) {
+        playBeep(250, 'sawtooth', 0.2);
+        showToast('請完成分數的分母與分子輸入喔！');
+        return;
+      }
+
+      let userTotalPos = 0;
+      if (userWhole > 0) {
+        userTotalPos = userWhole * userDen + userNum;
+      } else {
+        userTotalPos = userNum;
+      }
+
+      if (userDen === den && userTotalPos === target) {
+        playBeep(880, 'sine', 0.3);
+        triggerPraiseModal();
+      } else {
+        playBeep(220, 'sawtooth', 0.3);
+        showToast('答錯囉！請仔細數數看亮燈的單位分數共有幾個？分母又是幾？');
+      }
+    }
+
+    function triggerPraiseModal() {
+      const modal = document.getElementById('praiseModal');
+      const content = document.getElementById('modalContent');
+      const explBox = document.getElementById('modalExplanationBox');
+
+      const den = currentQuestion.den;
+      const target = currentQuestion.targetPos;
+      const startW = currentQuestion.startWhole || 0;
+
+      const isImproperMode = (challengeFormat === 'improper');
+      const displayWhole = Math.floor(target / den);
+      const displayNum = target % den;
+
+      explBox.innerHTML = `
+        <div class="bg-white p-3 rounded-xl border border-blue-200 text-center text-sm font-black text-blue-900 mb-2 flex items-center justify-center gap-2">
+          <span>目標刻度的正確值為：</span>
+          <span class="text-amber-600 text-lg font-black">
+            ${isImproperMode 
+              ? renderVerticalFractionHTML(target, den) 
+              : renderVerticalFractionHTML(displayNum, den, displayWhole)}
+          </span>
+        </div>
+        <p class="text-slate-700 leading-relaxed text-xs md:text-sm">
+          💡 <strong>觀念總結：</strong><br>
+          ${startW > 0 ? `• <strong>斷尺數線：</strong> 本題從 ${startW} 開始，已包含了前面 ${startW} 個完整的整體（1）。<br>` : ''}
+          • <strong>單位量 1：</strong> 數線上每 1 個單位的距離代表「1 個整體長方形」。<br>
+          • <strong>平分等份：</strong> 被平分成 ${den} 等份，每個亮燈小格就是 <span class="text-blue-600 font-black">${renderVerticalFractionHTML(1, den)}</span>。<br>
+          • <strong>累積量與刻度：</strong> 共亮燈累積了 <span class="text-blue-600 font-black">${target}</span> 個單位分數，對應的刻度值為 <span class="text-amber-600 font-black">${isImproperMode ? `${target}/${den}` : `${displayWhole}又${displayNum}/${den}`}</span>！
+        </p>
+      `;
+
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('scale-90');
+        content.classList.add('scale-100');
+      }, 50);
+    }
+
+    function closePraiseModal() {
+      const modal = document.getElementById('praiseModal');
+      const content = document.getElementById('modalContent');
+      modal.classList.add('opacity-0');
+      content.classList.remove('scale-100');
+      content.classList.add('scale-90');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 300);
+    }
+
+    function showToast(msg) {
+      let toast = document.createElement('div');
+      toast.className = "fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-bold text-xs md:text-sm px-4 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-2 max-w-md text-center border border-slate-700 animate-bounce";
+      toast.innerHTML = `<i class="fa-solid fa-lightbulb text-amber-400 text-base"></i> <span>${msg}</span>`;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 2800);
+    }
+  </script>
+</body>
+</html>
