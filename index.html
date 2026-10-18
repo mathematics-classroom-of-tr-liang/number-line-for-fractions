@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>認識分數數線</title>
+  <title>認識分數數線V2</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -43,7 +43,13 @@
     }
     .swipe-track {
       cursor: crosshair;
-      touch-action: none;
+      touch-action: pan-y; /* 預設允許頁面上下順暢滾動 */
+    }
+    .swipe-track.active-step1,
+    #canvasWrapper.active-step1 {
+      touch-action: none !important; /* 僅在步驟一劃線時鎖定數線區域滾動，確保極致順暢 */
+      -webkit-user-select: none;
+      user-select: none;
     }
     @keyframes pulse-glow {
       0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8)); }
@@ -608,8 +614,10 @@
       arrow.setAttribute('fill', '#0f172a');
       svg.appendChild(arrow);
 
-      // 步驟 1：手指/滑鼠拖曳軌跡
+      // 步驟 1：手指/滑鼠拖曳軌跡與動態觸控鎖定
       if (currentStep === 1) {
+        svg.classList.add('active-step1');
+        document.getElementById('canvasWrapper').classList.add('active-step1');
         const uIdxOnLine = currentUnitIndex - startW;
         const uStartX = startX + uIdxOnLine * unitLengthX;
         const uEndX = uStartX + unitLengthX;
@@ -638,20 +646,63 @@
           svg.appendChild(swipeLine);
         }
 
+        // 1. 擴大觸控視覺感應光環（專為特學生設計）
+        const haloCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        haloCircle.setAttribute('cx', uStartX);
+        haloCircle.setAttribute('cy', lineY);
+        haloCircle.setAttribute('r', '26');
+        haloCircle.setAttribute('fill', 'rgba(37, 99, 235, 0.25)');
+        haloCircle.setAttribute('class', 'animate-ping');
+        svg.appendChild(haloCircle);
+
+        // 2. 起點實心球體
         const startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         startCircle.setAttribute('cx', uStartX);
         startCircle.setAttribute('cy', lineY);
-        startCircle.setAttribute('r', '10');
+        startCircle.setAttribute('r', '15');
         startCircle.setAttribute('fill', '#2563eb');
         startCircle.setAttribute('class', 'animate-glow');
         svg.appendChild(startCircle);
 
+        // 3. 起點「按住右拉 ➔」視覺氣泡標籤（含指向小箭頭）
+        const dragHintGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        
+        const hintRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        hintRect.setAttribute('x', uStartX - 42);
+        hintRect.setAttribute('y', lineY - 64);
+        hintRect.setAttribute('width', '84');
+        hintRect.setAttribute('height', '28');
+        hintRect.setAttribute('fill', '#2563eb');
+        hintRect.setAttribute('rx', '14');
+        hintRect.setAttribute('filter', 'drop-shadow(0px 3px 6px rgba(0,0,0,0.25))');
+        dragHintGroup.appendChild(hintRect);
+
+        const hintArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hintArrow.setAttribute('d', `M ${uStartX - 6} ${lineY - 36} L ${uStartX} ${lineY - 28} L ${uStartX + 6} ${lineY - 36} Z`);
+        hintArrow.setAttribute('fill', '#2563eb');
+        dragHintGroup.appendChild(hintArrow);
+
+        const hintText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        hintText.setAttribute('x', uStartX);
+        hintText.setAttribute('y', lineY - 45);
+        hintText.setAttribute('text-anchor', 'middle');
+        hintText.setAttribute('fill', '#ffffff');
+        hintText.setAttribute('font-weight', '900');
+        hintText.setAttribute('font-size', '13');
+        hintText.textContent = '按住右拉 ➔';
+        dragHintGroup.appendChild(hintText);
+
+        svg.appendChild(dragHintGroup);
+
         const endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         endCircle.setAttribute('cx', uEndX);
         endCircle.setAttribute('cy', lineY);
-        endCircle.setAttribute('r', '10');
+        endCircle.setAttribute('r', '12');
         endCircle.setAttribute('fill', '#f59e0b');
         svg.appendChild(endCircle);
+      } else {
+        svg.classList.remove('active-step1');
+        document.getElementById('canvasWrapper').classList.remove('active-step1');
       }
 
       // 2. 刻度線與標籤
@@ -786,94 +837,103 @@
     }
 
     // -------------------------------------------------------------
-    // 長方形表徵繪製、PopOver 數字鍵盤、斷尺認領與點擊亮燈
+    // 長方形表徵層繪製 (與數線對齊)
     // -------------------------------------------------------------
     function renderOverlayBars() {
-      const layer = document.getElementById('overlayBarsLayer');
-      layer.innerHTML = '';
+      const container = document.getElementById('overlayBarsLayer');
+      if (!container) return;
+      container.innerHTML = '';
 
-      const { startX, lineY, unitLengthX } = canvasMetrics;
       const startW = currentQuestion.startWhole || 0;
+      const maxW = currentQuestion.maxWhole;
+      const den = currentQuestion.den;
+      const { startX, unitLengthX, lineY } = canvasMetrics;
 
-      // 繪製過去與當前區段的長方形
-      for (let u = startW; u <= currentUnitIndex; u++) {
+      if (!startX || !unitLengthX) return;
+
+      const topY = lineY - 65; // 位於數線上方 65px
+      const barHeight = 55;
+
+      // 針對已解鎖的單位區間繪製長方形表徵
+      for (let u = startW; u <= currentUnitIndex && u < maxW; u++) {
         const uIdxOnLine = u - startW;
-        const uLeft = startX + uIdxOnLine * unitLengthX;
-        const barY = lineY - 65;
+        const barLeft = startX + uIdxOnLine * unitLengthX;
 
-        // 步驟 1 且為當前區區劃：尚未降下長方形
-        if (u === currentUnitIndex && currentStep === 1) continue;
+        // 長方形容器
+        const unitBox = document.createElement('div');
+        unitBox.className = 'absolute rounded-xl border-2 border-blue-500/80 bg-blue-50/40 backdrop-blur-sm shadow-md overflow-hidden flex transition-all duration-300 pointer-events-auto';
+        unitBox.style.left = `${barLeft}px`;
+        unitBox.style.top = `${topY}px`;
+        unitBox.style.width = `${unitLengthX}px`;
+        unitBox.style.height = `${barHeight}px`;
 
-        const barContainer = document.createElement('div');
-        barContainer.className = 'absolute pointer-events-auto transition-all animate-bar-drop flex items-center justify-center';
-        barContainer.style.left = `${uLeft}px`;
-        barContainer.style.width = `${unitLengthX}px`;
-        barContainer.style.top = `${barY}px`;
-        barContainer.style.height = '50px';
-
-        if (u === currentUnitIndex && currentStep === 2) {
-          // 步驟 2：彈出 0~9 數字鍵盤
-          barContainer.className += ' bg-amber-200/90 border-4 border-amber-500 rounded-2xl shadow-xl';
-          
-          const popover = document.createElement('div');
-          popover.className = 'keypad-popover absolute z-30 bg-white border-4 border-amber-400 rounded-2xl p-3 shadow-2xl flex flex-col items-center gap-2 animate-bounce';
-          popover.style.top = '-110px';
-
-          popover.innerHTML = `
-            <div class="text-amber-950 font-black text-xs md:text-sm flex items-center gap-1">
-              <i class="fa-solid fa-scissors text-amber-600"></i>
-              <span>這段「1 個單位量」被平分成幾等分？</span>
-            </div>
-            <div class="grid grid-cols-5 gap-1.5 w-full">
-              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `
-                <button onclick="submitStep2Division(${n})" class="py-1.5 bg-amber-100 hover:bg-amber-500 hover:text-white text-amber-950 font-black rounded-xl text-sm border-2 border-amber-300 transition active:scale-95 shadow">
-                  ${n}
-                </button>
-              `).join('')}
+        // 步驟 2：直接在長方形上方彈出 0~9 / 等份選擇鍵盤
+        if (currentStep === 2 && u === currentUnitIndex) {
+          unitBox.className += ' border-amber-500 bg-amber-50/95 shadow-xl ring-4 ring-amber-300/50 z-20 animate-pulse';
+          unitBox.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center justify-center p-1 bg-amber-100/95">
+              <span class="text-[11px] md:text-xs font-black text-amber-900 mb-1">平分成幾等份？（請點擊）</span>
+              <div class="flex items-center justify-center gap-1 flex-wrap">
+                ${[2, 3, 4, 5, 6, 7, 8].map(k => `
+                  <button onclick="submitStep2Division(${k})" class="px-2 py-0.5 md:px-2.5 md:py-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black rounded-lg text-xs md:text-sm shadow">
+                    ${k}
+                  </button>
+                `).join('')}
+              </div>
             </div>
           `;
-          barContainer.appendChild(popover);
-        } 
-        else if (unitDivisions[u]) {
-          // 步驟 3/4：已平分的長方形
-          barContainer.className += ' border-4 border-blue-600 rounded-2xl bg-blue-50/70 shadow-md overflow-hidden flex';
-          
-          const divCount = unitDivisions[u];
-          const sliceWidth = unitLengthX / divCount;
-
-          for (let s = 0; s < divCount; s++) {
-            const globalSliceIdx = u * divCount + s;
-            const isLit = litSlices[globalSliceIdx];
-
-            const sliceDiv = document.createElement('div');
-            sliceDiv.style.width = `${sliceWidth}px`;
-            sliceDiv.className = `h-full border-r-2 border-dashed border-blue-400 flex items-center justify-center font-black text-xs cursor-pointer transition-all last:border-r-0 ${
-              isLit ? 'bg-amber-400 text-amber-950 shadow-inner' : 'hover:bg-blue-200/80 text-blue-800'
-            }`;
-
-            sliceDiv.innerHTML = renderVerticalFractionHTML(1, divCount);
-
-            if (currentStep === 3) {
-              sliceDiv.onclick = () => toggleSliceLight(globalSliceIdx);
-            }
-
-            barContainer.appendChild(sliceDiv);
-          }
+          container.appendChild(unitBox);
+          continue;
         }
 
-        layer.appendChild(barContainer);
+        // 步驟 3 或已平分階段：分割呈現單位分數小格
+        for (let i = 0; i < den; i++) {
+          const globalSlot = u * den + i;
+          const isLit = !!litSlices[globalSlot];
+
+          const sliceDiv = document.createElement('div');
+          sliceDiv.style.width = `${100 / den}%`;
+          sliceDiv.style.height = '100%';
+
+          let sliceClasses = 'flex flex-col items-center justify-center border-r border-dashed border-blue-400/60 transition-all duration-200 select-none ';
+          if (i === den - 1) sliceClasses = sliceClasses.replace('border-r', '');
+
+          if (isLit) {
+            sliceClasses += ' bg-amber-400 text-amber-950 font-black shadow-inner border-amber-500 animate-bar-drop';
+          } else {
+            sliceClasses += ' bg-blue-100/50 hover:bg-blue-200/80 text-blue-800 font-bold';
+          }
+
+          if (currentStep === 3) {
+            sliceClasses += ' cursor-pointer hover:scale-[1.02] active:scale-95 pointer-events-auto';
+            sliceDiv.onclick = (e) => {
+              e.stopPropagation();
+              clickSlice(globalSlot);
+            };
+          }
+
+          sliceDiv.className = sliceClasses;
+          sliceDiv.innerHTML = `
+            <span class="text-[10px] md:text-xs font-black leading-tight">
+              ${isLit ? '★' : ''} ${renderVerticalFractionHTML(1, den)}
+            </span>
+          `;
+
+          unitBox.appendChild(sliceDiv);
+        }
+
+        container.appendChild(unitBox);
       }
     }
 
-    // 步驟 2：選擇平分等份
-    function submitStep2Division(selectedDiv) {
-      if (selectedDiv === currentQuestion.den) {
-        playBeep(880, 'sine', 0.2);
-        unitDivisions[currentUnitIndex] = selectedDiv;
-        showToast(`答對了！這段「1 個單位量」被平分成 ${selectedDiv} 等份！`);
-        
+    function submitStep2Division(k) {
+      const correctDen = currentQuestion.den;
+      if (k === correctDen) {
+        unitDivisions[currentUnitIndex] = k;
+        playBeep(800, 'sine', 0.15);
+        showToast(`答對了！1 個單位量被平分成 ${k} 等份！`);
+
         const startW = currentQuestion.startWhole || 0;
-        // 如果是斷尺題型且尚未認領前置整數，先進入步驟 2.5
         if (startW > 0 && precedingWholesClicked < startW) {
           currentStep = 2.5;
         } else {
@@ -881,105 +941,94 @@
         }
         updateUI();
       } else {
-        playBeep(220, 'sawtooth', 0.2);
-        showToast(`不對喔！這段單位量被平分成 ${currentQuestion.den} 等份才對，再試一次！`);
+        playBeep(250, 'sawtooth', 0.2);
+        showToast(`不對喔！請仔細數數看 0 到 1 之間被平分成幾等份？`);
       }
     }
 
-    // 步驟 2.5：斷尺前置整數點擊認領 (修正卡住 BUG 並填充前置累積格)
-    function clickPrecedingWhole(index) {
-      if (index === precedingWholesClicked + 1) {
-        precedingWholesClicked++;
-        playBeep(600 + precedingWholesClicked * 100, 'sine', 0.15);
-        showToast(`成功確認第 ${precedingWholesClicked} 個前置整體「${precedingWholesClicked}」！`);
-        
+    function clickPrecedingWhole(idx) {
+      if (idx === precedingWholesClicked + 1) {
+        precedingWholesClicked = idx;
+        playBeep(700, 'sine', 0.1);
+
+        // 將前置整體量的所有小格填滿點亮
+        const den = currentQuestion.den;
+        for (let s = (idx - 1) * den; s < idx * den; s++) {
+          litSlices[s] = true;
+        }
+
         const startW = currentQuestion.startWhole || 0;
         if (precedingWholesClicked === startW) {
-          // 關鍵修復：將前置整數包含的所有單位分數小格標記為已累積亮燈
-          const totalPrecedingSlices = startW * currentQuestion.den;
-          for (let k = 0; k < totalPrecedingSlices; k++) {
-            litSlices[k] = true;
-          }
-
-          setTimeout(() => {
-            currentStep = 3;
-            updateUI();
-          }, 700);
-        } else {
-          updateUI();
+          currentStep = 3;
+          showToast('前置整體量已全部確認！開始點擊小格累積到目標刻度！');
         }
-      } else {
-        showToast(`請依序從第 1 個整體開始點擊確認喔！`);
-      }
-    }
-
-    // 步驟 3：點擊單位分數小格亮燈
-    function toggleSliceLight(globalIndex) {
-      const currentLitCount = litSlices.filter(Boolean).length;
-
-      if (!litSlices[globalIndex]) {
-        if (globalIndex === currentLitCount) {
-          litSlices[globalIndex] = true;
-          playBeep(500 + globalIndex * 50, 'sine', 0.1);
-          checkStep3Progress();
-        } else {
-          showToast('請依照數線從左到右的順序，依序點亮單位分數小格喔！');
-        }
-      } else {
-        if (globalIndex === currentLitCount - 1) {
-          litSlices[globalIndex] = false;
-          playBeep(350, 'sine', 0.08);
-          renderOverlayBars();
-          renderControlPanel();
-        }
-      }
-    }
-
-    function checkStep3Progress() {
-      const litCount = litSlices.filter(Boolean).length;
-      renderOverlayBars();
-      renderControlPanel();
-
-      if (litCount === currentQuestion.targetPos) {
-        playBeep(900, 'sine', 0.25);
-        showToast('太棒了！已順利亮燈累積到目標刻度！請準備輸入刻度值！');
-        setTimeout(() => {
-          currentStep = 4;
-          updateUI();
-        }, 1000);
-      } else if (litCount % currentQuestion.den === 0) {
-        currentUnitIndex++;
-        currentStep = 1;
-        playBeep(700, 'sine', 0.2);
-        showToast(`長方形「1」已點滿！請繼續劃出下一個單位量（${currentUnitIndex} ~ ${currentUnitIndex + 1}）！`);
         updateUI();
+      } else {
+        showToast(`請依序從整體 ${precedingWholesClicked + 1} 開始點擊喔！`);
+      }
+    }
+
+    function clickSlice(s) {
+      if (currentStep !== 3) return;
+      const target = currentQuestion.targetPos;
+      const currentLit = litSlices.filter(Boolean).length;
+
+      if (s === currentLit) {
+        if (s < target) {
+          litSlices[s] = true;
+          playBeep(500 + s * 30, 'sine', 0.1);
+          const newLit = currentLit + 1;
+
+          if (newLit === target) {
+            currentStep = 4;
+            showToast('🎯 成功亮燈累積到目標位置！請在下方鍵盤報讀刻度！');
+          } else {
+            const den = currentQuestion.den;
+            const currentUnitEndSlot = (currentUnitIndex + 1) * den;
+            if (newLit === currentUnitEndSlot && currentUnitIndex + 1 < currentQuestion.maxWhole) {
+              currentUnitIndex++;
+              currentStep = 1;
+              showToast(`太棒了！已填滿這個 1，請繼續劃出下一個單位量 (${currentUnitIndex} ~ ${currentUnitIndex + 1})！`);
+            }
+          }
+          updateUI();
+        }
+      } else if (s < currentLit) {
+        showToast('這個小格已經亮燈囉！');
+      } else {
+        showToast('請依照順序從小到大點擊小格亮燈喔！');
       }
     }
 
     // -------------------------------------------------------------
-    // 手指/滑鼠劃出單位長度手勢
+    // 手指/滑鼠劃出單位長度手勢 (針對平板觸控與滾動進行最佳化)
     // -------------------------------------------------------------
     function setupSwipeEvents() {
       const svg = document.getElementById('numberLineSvg');
 
-      const handleStart = (clientX) => {
+      const handleStart = (clientX, e) => {
         if (currentStep !== 1) return;
         const rect = svg.getBoundingClientRect();
         const x = clientX - rect.left;
         const startW = currentQuestion.startWhole || 0;
         const uIdxOnLine = currentUnitIndex - startW;
         const uStartX = canvasMetrics.startX + uIdxOnLine * canvasMetrics.unitLengthX;
+        const uEndX = uStartX + canvasMetrics.unitLengthX;
 
-        if (Math.abs(x - uStartX) < 45) {
+        // 擴大觸控感應區域（前後與周邊），讓特學生極易對準觸發
+        if (x >= uStartX - 80 && x <= uEndX + 40) {
           isSwiping = true;
           swipeStartX = uStartX;
-          swipeCurrentX = x;
+          swipeCurrentX = Math.max(uStartX, x);
+          if (e && e.cancelable) e.preventDefault(); // 即刻截斷預設頁面滾動
           renderNumberLine();
         }
       };
 
-      const handleMove = (clientX) => {
+      const handleMove = (clientX, e) => {
         if (!isSwiping || currentStep !== 1) return;
+        if (e && e.cancelable) e.preventDefault(); // 全程鎖定劃線體驗
+        
         const rect = svg.getBoundingClientRect();
         swipeCurrentX = clientX - rect.left;
         renderNumberLine();
@@ -991,8 +1040,10 @@
 
         if (swipeCurrentX >= uEndX - 10) {
           isSwiping = false;
+          svg.classList.remove('active-step1');
+          document.getElementById('canvasWrapper').classList.remove('active-step1');
           playBeep(800, 'sine', 0.15);
-          showToast(`成功劃出長度「1」！長方形表徵已降下！`);
+          showToast(`太棒了！成功劃出長度「1」！長方形表徵已降下！`);
           
           currentStep = 2;
           updateUI();
@@ -1007,17 +1058,27 @@
         }
       };
 
-      svg.addEventListener('mousedown', (e) => handleStart(e.clientX));
-      window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+      svg.addEventListener('mousedown', (e) => handleStart(e.clientX, e));
+      window.addEventListener('mousemove', (e) => handleMove(e.clientX, e));
       window.addEventListener('mouseup', handleEnd);
 
+      // 觸控事件：步驟一 TouchStart 發生時即刻截斷瀏覽器預設頁面滾動，達成紙滑級觸控手感
       svg.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 0) handleStart(e.touches[0].clientX);
-      }, { passive: true });
+        if (currentStep === 1) {
+          if (e.cancelable) e.preventDefault();
+          if (e.touches.length > 0) handleStart(e.touches[0].clientX, e);
+        }
+      }, { passive: false });
+
       window.addEventListener('touchmove', (e) => {
-        if (e.touches.length > 0) handleMove(e.touches[0].clientX);
-      }, { passive: true });
+        if (isSwiping && currentStep === 1) {
+          if (e.cancelable) e.preventDefault();
+          if (e.touches.length > 0) handleMove(e.touches[0].clientX, e);
+        }
+      }, { passive: false });
+
       window.addEventListener('touchend', handleEnd);
+      window.addEventListener('touchcancel', handleEnd);
     }
 
     // -------------------------------------------------------------
