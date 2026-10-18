@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>認識分數數線v3</title>
+  <title>認識分數數線V4</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -43,11 +43,11 @@
     }
     .swipe-track {
       cursor: crosshair;
-      touch-action: pan-y; /* 預設允許頁面上下順暢滾動 */
+      touch-action: pan-y;
     }
     .swipe-track.active-step1,
     #canvasWrapper.active-step1 {
-      touch-action: none !important; /* 僅在步驟一劃線時鎖定數線區域滾動，確保極致順暢 */
+      touch-action: none !important;
       -webkit-user-select: none;
       user-select: none;
     }
@@ -72,7 +72,6 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between p-2 md:p-4">
 
-  <!-- 頂部標題與模式切換區 -->
   <header class="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-2 flex flex-col xl:flex-row justify-between items-center gap-3 border-b-4 border-blue-600">
     <div class="flex items-center justify-between w-full xl:w-auto gap-3">
       <div class="flex items-center gap-3">
@@ -116,7 +115,6 @@
     </div>
   </header>
 
-  <!-- 步驟導引列 (動態支援 2.5 斷尺步驟) -->
   <section class="bg-slate-900 text-white rounded-2xl p-2.5 md:p-3 mb-2 shadow-md">
     <div id="stepWizardContainer" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm">
       <div id="step1Nav" class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 transition">
@@ -138,7 +136,6 @@
     </div>
   </section>
 
-  <!-- 主內容區：數線畫布區 + 控制操作區 -->
   <main class="flex-1 flex flex-col gap-2">
 
     <!-- 步驟提示卡片與目標指示 -->
@@ -158,7 +155,7 @@
       </div>
     </div>
 
-    <!-- 核心數線畫布區 -->
+    <!-- 核心數線畫布區：具備精準圖層分級 (Base < OverlayBars Z-10 < SVG Z-20/Z-30) -->
     <section id="numberLineStage" class="bg-white rounded-2xl p-3 md:p-5 shadow-sm border-2 border-slate-200 flex flex-col gap-1 relative overflow-hidden">
       <div class="flex items-center justify-between text-xs font-bold text-slate-500">
         <span class="flex items-center gap-1.5 text-slate-800 font-black text-sm md:text-base">
@@ -172,14 +169,14 @@
       <!-- SVG 數線與動態長方形表徵對齊層 -->
       <div id="canvasWrapper" class="w-full relative min-h-[290px] flex flex-col justify-center items-center select-none py-2">
         
-        <!-- 上方長方形表徵層 -->
+        <!-- 【圖層 1】長方形表徵與平分選單層 (z-10, 支援點擊) -->
         <div id="overlayBarsLayer" class="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-10">
           <!-- JS 動態生成長方形、斷尺前置積木與點擊亮燈格 -->
         </div>
 
-        <!-- SVG 數線與動態繪製刻度 -->
-        <svg id="numberLineSvg" class="w-full h-64 overflow-visible swipe-track">
-          <!-- 由 JS 繪製數線、斷尺符號、刻度與數字 -->
+        <!-- 【圖層 2 與 圖層 3】SVG 數線主軸、刻度、目標刻度標誌 (z-20) 與 按住右拉指引 (z-30 最頂層) -->
+        <svg id="numberLineSvg" class="w-full h-64 overflow-visible swipe-track relative z-20 pointer-events-none">
+          <!-- 由 JS 依序繪製數線、刻度、目標旗幟(次頂層)與右拉提示(最頂層) -->
         </svg>
       </div>
     </section>
@@ -193,7 +190,6 @@
 
   </main>
 
-  <!-- 答對讚美與觀念總結 Modal -->
   <div id="praiseModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
     <div class="bg-white rounded-3xl p-5 md:p-6 max-w-lg w-full shadow-2xl border-4 border-amber-300 text-center transform scale-90 transition-transform duration-300" id="modalContent">
       <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-2 text-amber-500 text-2xl shadow-inner">
@@ -215,75 +211,45 @@
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // 1. 全局狀態與擴充題庫（支援 0~5 範圍與斷尺起點）
-    // -------------------------------------------------------------
     const questionsPool = [
-      // 0~2, 0~3 基礎/進階題型
       { id: 'q1', den: 4, startWhole: 0, maxWhole: 2, targetPos: 5, basicTarget: { num: 5, den: 4 }, advTarget: { whole: 1, num: 1, den: 4 } },
-      
-      // 斷尺挑戰題型 (置於第 2 題，確保挑戰版第 2 題立即出現斷尺)
       { id: 'q10', den: 4, startWhole: 1, maxWhole: 3, targetPos: 9, basicTarget: { num: 9, den: 4 }, advTarget: { whole: 2, num: 1, den: 4 }, isBroken: true },
-      
       { id: 'q2', den: 3, startWhole: 0, maxWhole: 3, targetPos: 7, basicTarget: { num: 7, den: 3 }, advTarget: { whole: 2, num: 1, den: 3 } },
-      
-      // 斷尺挑戰題型 (置於第 4 題)
       { id: 'q11', den: 3, startWhole: 2, maxWhole: 5, targetPos: 11, basicTarget: { num: 11, den: 3 }, advTarget: { whole: 3, num: 2, den: 3 }, isBroken: true },
-      
       { id: 'q3', den: 5, startWhole: 0, maxWhole: 2, targetPos: 7, basicTarget: { num: 7, den: 5 }, advTarget: { whole: 1, num: 2, den: 5 } },
       { id: 'q4', den: 6, startWhole: 0, maxWhole: 3, targetPos: 14, basicTarget: { num: 14, den: 6 }, advTarget: { whole: 2, num: 2, den: 6 } },
       { id: 'q5', den: 8, startWhole: 0, maxWhole: 2, targetPos: 11, basicTarget: { num: 11, den: 8 }, advTarget: { whole: 1, num: 3, den: 8 } },
-      
-      // 0~4, 0~5 擴充數線題型
       { id: 'q6', den: 4, startWhole: 0, maxWhole: 4, targetPos: 13, basicTarget: { num: 13, den: 4 }, advTarget: { whole: 3, num: 1, den: 4 } },
       { id: 'q7', den: 5, startWhole: 0, maxWhole: 5, targetPos: 21, basicTarget: { num: 21, den: 5 }, advTarget: { whole: 4, num: 1, den: 5 } },
       { id: 'q8', den: 3, startWhole: 0, maxWhole: 5, targetPos: 11, basicTarget: { num: 11, den: 3 }, advTarget: { whole: 3, num: 2, den: 3 } },
       { id: 'q9', den: 6, startWhole: 0, maxWhole: 4, targetPos: 19, basicTarget: { num: 19, den: 6 }, advTarget: { whole: 3, num: 1, den: 6 } },
-      
-      // 斷尺題型
       { id: 'q12', den: 5, startWhole: 1, maxWhole: 4, targetPos: 13, basicTarget: { num: 13, den: 5 }, advTarget: { whole: 2, num: 3, den: 5 }, isBroken: true },
       { id: 'q13', den: 4, startWhole: 2, maxWhole: 5, targetPos: 15, basicTarget: { num: 15, den: 4 }, advTarget: { whole: 3, num: 3, den: 4 }, isBroken: true }
     ];
 
-    let currentMode = 'basic'; // 'basic' | 'advanced' | 'challenge'
+    let currentMode = 'basic';
     let currentQIndex = 0;
     let currentQuestion = questionsPool[0];
 
-    // 挑戰版專用：隨機要求假分數還是帶分數 ('improper' | 'mixed')
     let challengeFormat = 'improper';
-
-    // 目前運作的區間 (從 startWhole 開始)
     let currentUnitIndex = 0; 
-
-    // 步驟狀態：
-    // 1: 劃出 currentUnitIndex ~ currentUnitIndex+1 的長度
-    // 2: 長方形彈出 0~9 鍵盤輸入平分等份
-    // 2.5: (僅斷尺題) 點擊確認前置 0 ~ startWhole 的整體量積木
-    // 3: 點擊單位分數小格亮燈
-    // 4: 報讀目標刻度值（鍵盤輸入）
     let currentStep = 1;
-
-    // 斷尺前置步驟狀態：記錄已點擊的前置整體數
     let precedingWholesClicked = 0;
 
-    // 狀態追蹤
     let isSwiping = false;
     let swipeStartX = 0;
     let swipeCurrentX = 0;
 
-    // 長方形平分與點擊亮燈狀態
     let unitDivisions = {}; 
     let litSlices = []; 
 
-    // 步驟 4 使用者鍵盤輸入狀態
-    let inputFocusField = 'den'; // 'den' -> 'num' (基礎版/假分數) 或 'whole' -> 'den' -> 'num' (帶分數)
+    let inputFocusField = 'den';
     let inputWholeVal = '';
     let inputDenVal = '';
     let inputNumVal = '';
 
     let isSoundOn = true;
 
-    // 幾何座標與繪圖參數
     let canvasMetrics = {
       startX: 60,
       endX: 740,
@@ -293,7 +259,6 @@
       stepWidthX: 85
     };
 
-    // Audio Synth Synthesizer
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep(freq = 440, type = 'sine', duration = 0.1) {
       if (!isSoundOn) return;
@@ -317,7 +282,6 @@
       icon.className = isSoundOn ? 'fa-solid fa-volume-high text-blue-600' : 'fa-solid fa-volume-xmark text-slate-400';
     }
 
-    // 輔助函式：產生 HTML 直式分數
     function renderVerticalFractionHTML(num, den, whole = 0) {
       if (whole > 0) {
         return `
@@ -370,7 +334,6 @@
     function loadQuestion(index) {
       closePraiseModal();
 
-      // 根據模式篩選適用題庫
       let availableQuestions = questionsPool;
       if (currentMode === 'basic' || currentMode === 'advanced') {
         availableQuestions = questionsPool.filter(q => !q.isBroken);
@@ -379,7 +342,6 @@
       currentQIndex = index % availableQuestions.length;
       currentQuestion = availableQuestions[currentQIndex];
 
-      // 斷尺題一律固定使用【帶分數】；一般題於挑戰版隨機設定輸入格式
       if (currentQuestion.isBroken || (currentQuestion.startWhole || 0) > 0) {
         challengeFormat = 'mixed';
       } else if (currentMode === 'challenge') {
@@ -397,7 +359,6 @@
       currentStep = 1;      
       precedingWholesClicked = 0;
 
-      // 預設鍵盤焦點
       inputFocusField = (challengeFormat === 'improper') ? 'den' : 'whole';
       inputWholeVal = '';
       inputDenVal = '';
@@ -502,19 +463,22 @@
       });
     }
 
-    // -------------------------------------------------------------
-    // SVG 數線畫布繪製 (支援斷尺與動態刻度)
-    // -------------------------------------------------------------
     function renderNumberLine() {
       const svg = document.getElementById('numberLineSvg');
       svg.innerHTML = '';
+
+      // 動態管控 SVG 指針穿透機制：步驟一開啟拖曳觸控，其他步驟關閉點擊擋路，直通下方 HTML 長方形
+      if (currentStep === 1) {
+        svg.style.pointerEvents = 'auto';
+      } else {
+        svg.style.pointerEvents = 'none';
+      }
 
       const wrapperWidth = document.getElementById('canvasWrapper').clientWidth || 800;
       const den = currentQuestion.den;
       const startW = currentQuestion.startWhole || 0;
       const maxW = currentQuestion.maxWhole;
       
-      // 斷尺題留出左側空間以顯示前置整體量圖卡
       const leftMargin = (startW > 0) ? Math.max(180, wrapperWidth * 0.25) : 55;
       const rightMargin = 55;
       const startX = leftMargin;
@@ -527,9 +491,10 @@
 
       canvasMetrics = { startX, endX, width: wrapperWidth, lineY, unitLengthX, stepWidthX };
 
-      // 1. 斷尺前置整體量圖卡與鋸齒線符號 (若 startW > 0)
+      // -------------------------------------------------------------
+      // 【圖層 LEVEL 1】：數線主軸、刻度線、數字與斷尺說明符號
+      // -------------------------------------------------------------
       if (startW > 0) {
-        // 繪製斷尺前置整體量 (數字 1, 2, ...) 動態圖卡
         const precedingZoneWidth = startX - 45;
         const blockWidth = Math.min(75, precedingZoneWidth / startW);
 
@@ -540,7 +505,6 @@
 
           const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
-          // 積木圖卡背景
           const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           rect.setAttribute('x', boxX);
           rect.setAttribute('y', boxY);
@@ -553,7 +517,6 @@
           if (!isConfirmed) rect.setAttribute('stroke-dasharray', '4 3');
           g.appendChild(rect);
 
-          // 大數字標示 (1, 2)
           const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           text.setAttribute('x', boxX + blockWidth / 2);
           text.setAttribute('y', boxY + 28);
@@ -564,7 +527,6 @@
           text.textContent = isConfirmed ? `✓ ${k}` : `${k}?`;
           g.appendChild(text);
 
-          // 說明文字 (整體 1, 整體 2)
           const subText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           subText.setAttribute('x', boxX + blockWidth / 2);
           subText.setAttribute('y', boxY + 58);
@@ -578,7 +540,6 @@
           svg.appendChild(g);
         }
 
-        // 鋸齒線符號
         const breakPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         breakPath.setAttribute('d', `M ${startX - 30} ${lineY} L ${startX - 22} ${lineY - 14} L ${startX - 14} ${lineY + 14} L ${startX - 6} ${lineY - 14} L ${startX} ${lineY}`);
         breakPath.setAttribute('stroke', '#e11d48');
@@ -597,7 +558,7 @@
         svg.appendChild(breakText);
       }
 
-      // 數線主軸
+      // 數線主線段
       const mainLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       mainLine.setAttribute('x1', startX - (startW > 0 ? 5 : 15));
       mainLine.setAttribute('y1', lineY);
@@ -608,13 +569,93 @@
       mainLine.setAttribute('stroke-linecap', 'round');
       svg.appendChild(mainLine);
 
-      // 數線箭頭
+      // 數線右側箭頭
       const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       arrow.setAttribute('d', `M ${endX + 15} ${lineY - 7} L ${endX + 27} ${lineY} L ${endX + 15} ${lineY + 7} Z`);
       arrow.setAttribute('fill', '#0f172a');
       svg.appendChild(arrow);
 
-      // 步驟 1：手指/滑鼠拖曳軌跡與動態觸控鎖定
+      // 繪製數線刻度線與對應整數標籤
+      const totalTicksOnLine = totalUnitsOnLine * den;
+      for (let i = 0; i <= totalTicksOnLine; i++) {
+        const isMajor = (i % den === 0);
+        const tickX = startX + i * stepWidthX;
+
+        const tickLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tickLine.setAttribute('x1', tickX);
+        tickLine.setAttribute('y1', isMajor ? lineY - 20 : lineY - 12);
+        tickLine.setAttribute('x2', tickX);
+        tickLine.setAttribute('y2', isMajor ? lineY + 20 : lineY + 12);
+        tickLine.setAttribute('stroke', isMajor ? '#0f172a' : '#64748b');
+        tickLine.setAttribute('stroke-width', isMajor ? '4' : '2.5');
+        svg.appendChild(tickLine);
+
+        if (isMajor) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', tickX);
+          text.setAttribute('y', lineY + 44);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-weight', '900');
+          text.setAttribute('fill', '#0f172a');
+          text.setAttribute('font-size', '20');
+          text.textContent = startW + (i / den);
+          svg.appendChild(text);
+        } else if (i === 1) {
+          if (currentMode === 'basic') {
+            appendSVGVerticalFraction(svg, tickX, lineY + 36, 1, den, '#2563eb');
+          } else {
+            const qText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            qText.setAttribute('x', tickX);
+            qText.setAttribute('y', lineY + 44);
+            qText.setAttribute('text-anchor', 'middle');
+            qText.setAttribute('font-weight', '900');
+            qText.setAttribute('fill', '#d97706');
+            qText.setAttribute('font-size', '20');
+            qText.textContent = '?';
+            svg.appendChild(qText);
+          }
+        }
+      }
+
+      for (let i = 0; i <= totalTicksOnLine; i++) {
+        const globalTickIndex = startW * den + i;
+        const tickX = startX + i * stepWidthX;
+
+        if (globalTickIndex === currentQuestion.targetPos) {
+          const targetGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          targetGroup.setAttribute('class', 'animate-glow pointer-events-none');
+          targetGroup.setAttribute('style', 'pointer-events: none;'); // 穿透性保護
+
+          const ptr = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          ptr.setAttribute('d', `M ${tickX} ${lineY - 26} L ${tickX - 8} ${lineY - 38} L ${tickX + 8} ${lineY - 38} Z`);
+          ptr.setAttribute('fill', '#f59e0b');
+          targetGroup.appendChild(ptr);
+
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', tickX - 32);
+          rect.setAttribute('y', lineY - 74);
+          rect.setAttribute('width', '64');
+          rect.setAttribute('height', '36');
+          rect.setAttribute('fill', '#fef3c7');
+          rect.setAttribute('stroke', '#f59e0b');
+          rect.setAttribute('stroke-width', '2.5');
+          rect.setAttribute('rx', '8');
+          targetGroup.appendChild(rect);
+
+          const targetLabelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          targetLabelText.setAttribute('x', tickX);
+          targetLabelText.setAttribute('y', lineY - 50);
+          targetLabelText.setAttribute('text-anchor', 'middle');
+          targetLabelText.setAttribute('fill', '#b45309');
+          targetLabelText.setAttribute('font-weight', '900');
+          targetLabelText.setAttribute('font-size', '15');
+          targetLabelText.textContent = '🎯 目標 ?';
+          targetGroup.appendChild(targetLabelText);
+
+          svg.appendChild(targetGroup);
+        }
+      }
+
       if (currentStep === 1) {
         svg.classList.add('active-step1');
         document.getElementById('canvasWrapper').classList.add('active-step1');
@@ -646,7 +687,6 @@
           svg.appendChild(swipeLine);
         }
 
-        // 1. 擴大觸控視覺感應光環（專為特學生設計）
         const haloCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         haloCircle.setAttribute('cx', uStartX);
         haloCircle.setAttribute('cy', lineY);
@@ -655,7 +695,6 @@
         haloCircle.setAttribute('class', 'animate-ping');
         svg.appendChild(haloCircle);
 
-        // 2. 起點實心球體
         const startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         startCircle.setAttribute('cx', uStartX);
         startCircle.setAttribute('cy', lineY);
@@ -664,9 +703,11 @@
         startCircle.setAttribute('class', 'animate-glow');
         svg.appendChild(startCircle);
 
-        // 3. 起點「按住右拉 ➔」視覺氣泡標籤（含指向小箭頭）
+        // 「按住右拉 ➔」最高視角提示群組 (完全蓋在最上層，清晰無遮擋)
         const dragHintGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        
+        dragHintGroup.setAttribute('class', 'pointer-events-none');
+        dragHintGroup.setAttribute('style', 'pointer-events: none;');
+
         const hintRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         hintRect.setAttribute('x', uStartX - 42);
         hintRect.setAttribute('y', lineY - 64);
@@ -704,91 +745,12 @@
         svg.classList.remove('active-step1');
         document.getElementById('canvasWrapper').classList.remove('active-step1');
       }
-
-      // 2. 刻度線與標籤
-      const totalTicksOnLine = totalUnitsOnLine * den;
-
-      for (let i = 0; i <= totalTicksOnLine; i++) {
-        const globalTickIndex = startW * den + i;
-        const isMajor = (i % den === 0);
-        const tickX = startX + i * stepWidthX;
-
-        // 刻度線
-        const tickLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        tickLine.setAttribute('x1', tickX);
-        tickLine.setAttribute('y1', isMajor ? lineY - 20 : lineY - 12);
-        tickLine.setAttribute('x2', tickX);
-        tickLine.setAttribute('y2', isMajor ? lineY + 20 : lineY + 12);
-        tickLine.setAttribute('stroke', isMajor ? '#0f172a' : '#64748b');
-        tickLine.setAttribute('stroke-width', isMajor ? '4' : '2.5');
-        svg.appendChild(tickLine);
-
-        // 刻度數字
-        if (isMajor) {
-          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          text.setAttribute('x', tickX);
-          text.setAttribute('y', lineY + 44);
-          text.setAttribute('text-anchor', 'middle');
-          text.setAttribute('font-weight', '900');
-          text.setAttribute('fill', '#0f172a');
-          text.setAttribute('font-size', '20');
-          text.textContent = startW + (i / den);
-          svg.appendChild(text);
-        } else if (i === 1) {
-          // 第一刻度
-          if (currentMode === 'basic') {
-            appendSVGVerticalFraction(svg, tickX, lineY + 36, 1, den, '#2563eb');
-          } else {
-            const qText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            qText.setAttribute('x', tickX);
-            qText.setAttribute('y', lineY + 44);
-            qText.setAttribute('text-anchor', 'middle');
-            qText.setAttribute('font-weight', '900');
-            qText.setAttribute('fill', '#d97706');
-            qText.setAttribute('font-size', '20');
-            qText.textContent = '?';
-            svg.appendChild(qText);
-          }
-        }
-
-        // 目標刻度旗幟
-        if (globalTickIndex === currentQuestion.targetPos) {
-          const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-          group.setAttribute('class', 'animate-glow');
-
-          const ptr = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          ptr.setAttribute('d', `M ${tickX} ${lineY - 26} L ${tickX - 8} ${lineY - 38} L ${tickX + 8} ${lineY - 38} Z`);
-          ptr.setAttribute('fill', '#f59e0b');
-          group.appendChild(ptr);
-
-          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('x', tickX - 32);
-          rect.setAttribute('y', lineY - 74);
-          rect.setAttribute('width', '64');
-          rect.setAttribute('height', '36');
-          rect.setAttribute('fill', '#fef3c7');
-          rect.setAttribute('stroke', '#f59e0b');
-          rect.setAttribute('stroke-width', '2.5');
-          rect.setAttribute('rx', '8');
-          group.appendChild(rect);
-
-          const targetLabelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          targetLabelText.setAttribute('x', tickX);
-          targetLabelText.setAttribute('y', lineY - 50);
-          targetLabelText.setAttribute('text-anchor', 'middle');
-          targetLabelText.setAttribute('fill', '#b45309');
-          targetLabelText.setAttribute('font-weight', '900');
-          targetLabelText.setAttribute('font-size', '15');
-          targetLabelText.textContent = '🎯 目標 ?';
-          group.appendChild(targetLabelText);
-
-          svg.appendChild(group);
-        }
-      }
     }
 
     function appendSVGVerticalFraction(svg, x, y, num, den, color = '#2563eb', whole = 0) {
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'pointer-events-none');
+      g.setAttribute('style', 'pointer-events: none;');
       
       let offsetX = x;
       if (whole > 0) {
@@ -836,9 +798,6 @@
       svg.appendChild(g);
     }
 
-    // -------------------------------------------------------------
-    // 長方形表徵層繪製 (與數線對齊)
-    // -------------------------------------------------------------
     function renderOverlayBars() {
       const container = document.getElementById('overlayBarsLayer');
       if (!container) return;
@@ -851,20 +810,17 @@
 
       if (!startX || !unitLengthX) return;
 
-      const topY = lineY - 65; // 位於數線上方 65px
+      const topY = lineY - 65;
       const barHeight = 55;
 
-      // 針對已解鎖的單位區間繪製長方形表徵
       for (let u = startW; u <= currentUnitIndex && u < maxW; u++) {
         const uIdxOnLine = u - startW;
         const barLeft = startX + uIdxOnLine * unitLengthX;
 
-        // 1. 步驟 1：尚未用手指劃出長度 1 之前，先不呈現長方形分數表徵
         if (currentStep === 1 && u === currentUnitIndex) {
           continue;
         }
 
-        // 長方形容器
         const unitBox = document.createElement('div');
         unitBox.className = 'absolute rounded-xl border-2 border-blue-500/80 bg-blue-50/40 backdrop-blur-sm shadow-md overflow-hidden flex transition-all duration-300 pointer-events-auto';
         unitBox.style.left = `${barLeft}px`;
@@ -872,7 +828,6 @@
         unitBox.style.width = `${unitLengthX}px`;
         unitBox.style.height = `${barHeight}px`;
 
-        // 2. 步驟 2：平分階段，將數字選擇面板以「上方浮動氣泡」呈現，完整保留長方形表徵全貌
         if (currentStep === 2 && u === currentUnitIndex) {
           unitBox.className = 'absolute rounded-xl border-4 border-amber-500 bg-amber-50/90 shadow-lg flex items-center justify-center pointer-events-auto transition-all duration-300 ring-4 ring-amber-300/40 z-20 overflow-visible';
           unitBox.style.left = `${barLeft}px`;
@@ -880,14 +835,12 @@
           unitBox.style.width = `${unitLengthX}px`;
           unitBox.style.height = `${barHeight}px`;
 
-          // 長方形主體維持 100% 完整無遮檔，並標示「完整長方形（整體 1）」
           unitBox.innerHTML = `
             <div class="flex items-center gap-1.5 bg-white/95 px-3 py-1 rounded-xl border border-amber-300 shadow-sm text-amber-950 font-black text-xs md:text-sm">
               <i class="fa-solid fa-vector-square text-amber-600"></i>
               <span>完整長方形（整體 1）</span>
             </div>
 
-            <!-- 浮動氣泡選單：置於長方形正上方，絕不掩蓋長方形本體 -->
             <div class="absolute -top-16 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-2 rounded-2xl shadow-2xl z-30 flex flex-col items-center gap-1 border-2 border-amber-400 pointer-events-auto whitespace-nowrap keypad-popover">
               <div class="text-[11px] md:text-xs font-black text-amber-300 flex items-center gap-1">
                 <i class="fa-solid fa-scissors"></i> 平分成幾等份？（請點擊）
@@ -899,7 +852,6 @@
                   </button>
                 `).join('')}
               </div>
-              <!-- 指向長方形的氣泡箭頭 -->
               <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-slate-900"></div>
             </div>
           `;
@@ -907,7 +859,6 @@
           continue;
         }
 
-        // 步驟 3 或已平分階段：分割呈現單位分數小格
         for (let i = 0; i < den; i++) {
           const globalSlot = u * den + i;
           const isLit = !!litSlices[globalSlot];
@@ -916,7 +867,7 @@
           sliceDiv.style.width = `${100 / den}%`;
           sliceDiv.style.height = '100%';
 
-          let sliceClasses = 'flex flex-col items-center justify-center border-r border-dashed border-blue-400/60 transition-all duration-200 select-none ';
+          let sliceClasses = 'flex flex-col items-center justify-center border-r border-dashed border-slate-400 transition-all duration-200 select-none ';
           if (i === den - 1) sliceClasses = sliceClasses.replace('border-r', '');
 
           if (isLit) {
@@ -972,7 +923,6 @@
         precedingWholesClicked = idx;
         playBeep(700, 'sine', 0.1);
 
-        // 將前置整體量的所有小格填滿點亮
         const den = currentQuestion.den;
         for (let s = (idx - 1) * den; s < idx * den; s++) {
           litSlices[s] = true;
@@ -1021,11 +971,9 @@
       }
     }
 
-    // -------------------------------------------------------------
-    // 手指/滑鼠劃出單位長度手勢 (針對平板觸控與滾動進行最佳化)
-    // -------------------------------------------------------------
     function setupSwipeEvents() {
       const svg = document.getElementById('numberLineSvg');
+      const wrapper = document.getElementById('canvasWrapper');
 
       const handleStart = (clientX, e) => {
         if (currentStep !== 1) return;
@@ -1036,19 +984,18 @@
         const uStartX = canvasMetrics.startX + uIdxOnLine * canvasMetrics.unitLengthX;
         const uEndX = uStartX + canvasMetrics.unitLengthX;
 
-        // 擴大觸控感應區域（前後與周邊），讓特學生極易對準觸發
         if (x >= uStartX - 80 && x <= uEndX + 40) {
           isSwiping = true;
           swipeStartX = uStartX;
           swipeCurrentX = Math.max(uStartX, x);
-          if (e && e.cancelable) e.preventDefault(); // 即刻截斷預設頁面滾動
+          if (e && e.cancelable) e.preventDefault();
           renderNumberLine();
         }
       };
 
       const handleMove = (clientX, e) => {
         if (!isSwiping || currentStep !== 1) return;
-        if (e && e.cancelable) e.preventDefault(); // 全程鎖定劃線體驗
+        if (e && e.cancelable) e.preventDefault();
         
         const rect = svg.getBoundingClientRect();
         swipeCurrentX = clientX - rect.left;
@@ -1062,7 +1009,7 @@
         if (swipeCurrentX >= uEndX - 10) {
           isSwiping = false;
           svg.classList.remove('active-step1');
-          document.getElementById('canvasWrapper').classList.remove('active-step1');
+          wrapper.classList.remove('active-step1');
           playBeep(800, 'sine', 0.15);
           showToast(`太棒了！成功劃出長度「1」！長方形表徵已降下！`);
           
@@ -1083,8 +1030,7 @@
       window.addEventListener('mousemove', (e) => handleMove(e.clientX, e));
       window.addEventListener('mouseup', handleEnd);
 
-      // 觸控事件：步驟一 TouchStart 發生時即刻截斷瀏覽器預設頁面滾動，達成紙滑級觸控手感
-      svg.addEventListener('touchstart', (e) => {
+      wrapper.addEventListener('touchstart', (e) => {
         if (currentStep === 1) {
           if (e.cancelable) e.preventDefault();
           if (e.touches.length > 0) handleStart(e.touches[0].clientX, e);
@@ -1102,9 +1048,6 @@
       window.addEventListener('touchcancel', handleEnd);
     }
 
-    // -------------------------------------------------------------
-    // 控制面板與步驟 UI 操作邏輯
-    // -------------------------------------------------------------
     function renderControlPanel() {
       const panel = document.getElementById('stepControlPanel');
       const instruction = document.getElementById('instructionText');
@@ -1118,7 +1061,7 @@
         instruction.innerHTML = `【步驟 1】請用手指或滑鼠從數線上 <span class="text-blue-600 font-black text-lg">${startUnit}</span> 拖曳拉到 <span class="text-blue-600 font-black text-lg">${endUnit}</span>，劃出「1 個單位量」的長度！`;
         panel.innerHTML = `
           <p class="text-slate-700 font-bold text-xs md:text-sm animate-pulse">
-            👉 請在數線上從 ${startUnit} 滑動到 ${endUnit}
+            👉 請在數線上從 ${startUnit} 按住右拉到 ${endUnit}
           </p>
         `;
       } else if (currentStep === 2) {
@@ -1129,7 +1072,6 @@
           </p>
         `;
       } else if (currentStep === 2.5) {
-        // 斷尺前置量認領提示
         instruction.innerHTML = `【步驟 2.5】這是一把從 <span class="text-rose-600 font-black text-lg">${startW}</span> 開始的斷尺數線！請點擊下方面板確認前面的 <span class="text-rose-600 font-black text-lg">${startW}</span> 個整體，會同步顯示在數線斷尺區！`;
         
         panel.innerHTML = `
@@ -1173,25 +1115,20 @@
         panel.innerHTML = `
           <div class="flex flex-col xl:flex-row items-center justify-center gap-4 w-full">
             
-            <!-- 分數輸入顯示方塊 -->
             <div class="flex items-center gap-3 bg-slate-100 p-3 rounded-2xl border-2 border-slate-300">
               <span class="font-black text-slate-700 text-xs md:text-sm">輸入：</span>
               
               ${!isImproperMode ? `
-                <!-- 整數部分 (僅帶分數模式顯示) -->
                 <div onclick="setFocusField('whole')" class="w-12 h-12 bg-white border-4 ${inputFocusField === 'whole' ? 'border-amber-500 bg-amber-50 shadow-md scale-105' : 'border-slate-300'} rounded-xl flex items-center justify-center text-slate-900 font-black text-xl cursor-pointer">
                   ${inputWholeVal || '<span class="text-slate-300 text-xs">整數</span>'}
                 </div>
               ` : ''}
 
-              <!-- 分數部分 (分子/分母) -->
               <div class="flex flex-col items-center gap-1">
-                <!-- 分子 -->
                 <div onclick="setFocusField('num')" class="w-12 h-10 bg-white border-4 ${inputFocusField === 'num' ? 'border-amber-500 bg-amber-50 shadow-md scale-105' : 'border-slate-300'} rounded-xl flex items-center justify-center text-slate-900 font-black text-base cursor-pointer">
                   ${inputNumVal || '<span class="text-slate-300 text-xs">分子</span>'}
                 </div>
                 <div class="w-12 h-1 bg-slate-800 rounded"></div>
-                <!-- 分母 -->
                 <div onclick="setFocusField('den')" class="w-12 h-10 bg-white border-4 ${inputFocusField === 'den' ? 'border-amber-500 bg-amber-50 shadow-md scale-105' : 'border-slate-300'} rounded-xl flex items-center justify-center text-slate-900 font-black text-base cursor-pointer">
                   ${inputDenVal || '<span class="text-slate-300 text-xs">分母</span>'}
                 </div>
@@ -1202,7 +1139,6 @@
               </button>
             </div>
 
-            <!-- 0~9 數字鍵盤 -->
             <div class="flex flex-col items-center gap-2">
               <div class="grid grid-cols-5 gap-1.5">
                 ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(digit => `
@@ -1269,9 +1205,6 @@
       renderControlPanel();
     }
 
-    // -------------------------------------------------------------
-    // 驗證最終答案與說明卡片
-    // -------------------------------------------------------------
     function verifyFinalAnswer() {
       const den = currentQuestion.den;
       const target = currentQuestion.targetPos;
