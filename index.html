@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>認識分數數線V2</title>
+  <title>認識分數數線v3</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -859,6 +859,11 @@
         const uIdxOnLine = u - startW;
         const barLeft = startX + uIdxOnLine * unitLengthX;
 
+        // 1. 步驟 1：尚未用手指劃出長度 1 之前，先不呈現長方形分數表徵
+        if (currentStep === 1 && u === currentUnitIndex) {
+          continue;
+        }
+
         // 長方形容器
         const unitBox = document.createElement('div');
         unitBox.className = 'absolute rounded-xl border-2 border-blue-500/80 bg-blue-50/40 backdrop-blur-sm shadow-md overflow-hidden flex transition-all duration-300 pointer-events-auto';
@@ -867,19 +872,35 @@
         unitBox.style.width = `${unitLengthX}px`;
         unitBox.style.height = `${barHeight}px`;
 
-        // 步驟 2：直接在長方形上方彈出 0~9 / 等份選擇鍵盤
+        // 2. 步驟 2：平分階段，將數字選擇面板以「上方浮動氣泡」呈現，完整保留長方形表徵全貌
         if (currentStep === 2 && u === currentUnitIndex) {
-          unitBox.className += ' border-amber-500 bg-amber-50/95 shadow-xl ring-4 ring-amber-300/50 z-20 animate-pulse';
+          unitBox.className = 'absolute rounded-xl border-4 border-amber-500 bg-amber-50/90 shadow-lg flex items-center justify-center pointer-events-auto transition-all duration-300 ring-4 ring-amber-300/40 z-20 overflow-visible';
+          unitBox.style.left = `${barLeft}px`;
+          unitBox.style.top = `${topY}px`;
+          unitBox.style.width = `${unitLengthX}px`;
+          unitBox.style.height = `${barHeight}px`;
+
+          // 長方形主體維持 100% 完整無遮檔，並標示「完整長方形（整體 1）」
           unitBox.innerHTML = `
-            <div class="w-full h-full flex flex-col items-center justify-center p-1 bg-amber-100/95">
-              <span class="text-[11px] md:text-xs font-black text-amber-900 mb-1">平分成幾等份？（請點擊）</span>
-              <div class="flex items-center justify-center gap-1 flex-wrap">
+            <div class="flex items-center gap-1.5 bg-white/95 px-3 py-1 rounded-xl border border-amber-300 shadow-sm text-amber-950 font-black text-xs md:text-sm">
+              <i class="fa-solid fa-vector-square text-amber-600"></i>
+              <span>完整長方形（整體 1）</span>
+            </div>
+
+            <!-- 浮動氣泡選單：置於長方形正上方，絕不掩蓋長方形本體 -->
+            <div class="absolute -top-16 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-2 rounded-2xl shadow-2xl z-30 flex flex-col items-center gap-1 border-2 border-amber-400 pointer-events-auto whitespace-nowrap keypad-popover">
+              <div class="text-[11px] md:text-xs font-black text-amber-300 flex items-center gap-1">
+                <i class="fa-solid fa-scissors"></i> 平分成幾等份？（請點擊）
+              </div>
+              <div class="flex items-center gap-1">
                 ${[2, 3, 4, 5, 6, 7, 8].map(k => `
-                  <button onclick="submitStep2Division(${k})" class="px-2 py-0.5 md:px-2.5 md:py-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black rounded-lg text-xs md:text-sm shadow">
+                  <button onclick="submitStep2Division(${k})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black rounded-lg text-xs md:text-sm shadow transition">
                     ${k}
                   </button>
                 `).join('')}
               </div>
+              <!-- 指向長方形的氣泡箭頭 -->
+              <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-slate-900"></div>
             </div>
           `;
           container.appendChild(unitBox);
